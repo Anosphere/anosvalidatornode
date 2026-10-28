@@ -238,9 +238,9 @@ Before the VM: the project side, in the operator guide's Network section
 forwarding, the tags, the firewall rules, the route, SSH through IAP, the
 budget. The doorman VM is Debian 13 with unattended upgrades on
 (`systemctl status unattended-upgrades`), `e2-small`, IP forwarding on,
-tag `doorman`. Then, over `gcloud compute ssh operator@doorman --zone <zone>
+tag `doorman`. Then, over `gcloud compute ssh banker@doorman --zone <zone>
 --tunnel-through-iap` (operator guide, step 2, point 10: the login user
-`operator`, the same on every VM), in this order.
+`banker`, the same on every VM), in this order.
 
 1. Packages:
 
