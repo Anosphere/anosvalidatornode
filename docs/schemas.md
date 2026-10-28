@@ -6,7 +6,8 @@ Built 2026-10-27 straight from
 `~/Desktop/Z-TestNet/forclaude/doorman-build-1-code-ready.md` (FINAL,
 decided in its planning chat), as a new repo next to anossoftware and
 keyholdersoftware in the testnet tree. One edit outside it: step 3 of
-anossoftware's `docs/operator-guide.md` became the Network section. Nothing
+the operator guide (then anossoftware's `docs/operator-guide.md`, since moved
+to `guides/operator-guide.md` beside the repos) became the Network section. Nothing
 about the protocol, the tables, the routes that carry traffic, the worker's
 code or the wallet changed. No check ran but `node --check` on each
 JavaScript file and `npm install` once, for the lock file: the first boot on
@@ -157,7 +158,9 @@ Outside the repo, on the VM: `/etc/sysctl.d/90-doorman.conf`,
 `/etc/fail2ban/filter.d/doorman-429.conf`, the three units in
 `/etc/systemd/system/`, acme.sh under `/root/.acme.sh` with its cron.
 
-The one change in anossoftware: `docs/operator-guide.md`, step 3, the
+The one change in anossoftware: the operator guide (then
+`docs/operator-guide.md`, since moved to `guides/operator-guide.md` beside
+the repos), step 3, the
 Network section (the static IP, IP forwarding, the tags, the four firewall
 rules, the worker route, IAP SSH, the budget), with the text the plan gave.
 
