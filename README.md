@@ -234,7 +234,7 @@ certificate's 6.7, so under 2 days left means two renewals failed.
 ## The doorman VM
 
 Before the VM: the project side, in the operator guide's Network section
-(`guides/operator-guide.md`, kept beside the repos in the testnet folder, step 3): the static IP, IP
+(`guides/operator-guide.md`, kept beside the repos in the testnet folder, step 2): the static IP, IP
 forwarding, the tags, the firewall rules, the route, SSH through IAP, the
 budget. The doorman VM is Debian 13 with unattended upgrades on
 (`systemctl status unattended-upgrades`), `e2-small`, IP forwarding on,
