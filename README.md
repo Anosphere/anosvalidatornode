@@ -255,7 +255,7 @@ sudo apt install -y nodejs
 ```bash
 sudo useradd --system --create-home --home-dir /opt/doorman --shell /bin/bash doorman
 sudo -iu doorman
-git clone <the doormansoftware repository> /opt/doorman/doormansoftware
+git clone https://github.com/Anosphere/anosvalidatornode.git /opt/doorman/doormansoftware
 cd /opt/doorman/doormansoftware && npm ci
 npm run setup -- --worker-ip <the worker's internal IP>
 exit
@@ -298,9 +298,14 @@ curl -k https://127.0.0.1:3000/health
 curl -k https://127.0.0.1:3200/health
 ```
 
-   The journal shows the four boot lines. Health answers 503 `degraded`
-   with `worker: null` until the worker is up; `-k` only because the
-   certificate names the public IP, not 127.0.0.1. From your own machine,
+   Until your registry row is in (operator guide, step 9), the door refuses
+   to boot: the journal shows `Registry failed: ... publicKey is still
+   "<fill in>"` every five seconds and both health calls get nginx's 502.
+   Expected; the NAT, port 80 and the certificate do not need the door.
+   With the row pulled and the door restarted, the journal shows the four
+   boot lines, and health answers 503 `degraded` with `worker: null` until
+   the worker is up; `-k` only because the certificate names the public IP,
+   not 127.0.0.1. From your own machine,
    `curl https://<doorman static ip>:3000/health` verifies the certificate.
 
 6. The worker, per the operator guide. Once it runs, both health answers
