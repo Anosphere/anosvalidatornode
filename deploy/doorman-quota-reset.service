@@ -1,0 +1,6 @@
+[Unit]
+Description=anos doorman: reset the monthly egress quota
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/nft reset quota inet doorman egress-month

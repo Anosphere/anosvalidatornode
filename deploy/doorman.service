@@ -1,0 +1,17 @@
+[Unit]
+Description=anos doorman
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=doorman
+WorkingDirectory=/opt/doorman/doormansoftware
+ExecStart=/usr/bin/node --env-file=network/testnet.env --env-file=.env src/server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
