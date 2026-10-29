@@ -233,6 +233,16 @@ certificate's 6.7, so under 2 days left means two renewals failed.
 
 ## The doorman VM
 
+The bootstrap script does steps 1 to 5 below in one run, prints one line
+per step and `done`, and is run again, with nothing after the script name,
+once your registry row is in and for every update (operator guide, Part A):
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/Anosphere/anosvalidatornode/main/scripts/bootstrap-doorman.sh && sudo sh bootstrap-doorman.sh --worker-ip <worker internal ip> --doorman-ip <doorman static ip> --email <your email>
+```
+
+The steps below are the same work by hand.
+
 Before the VM: the project side, in the operator guide's Network section
 (`guides/operator-guide.md`, kept beside the repos in the testnet folder, step 2): the static IP, IP
 forwarding, the tags, the firewall rules, the route, SSH through IAP, the
@@ -299,15 +309,14 @@ curl -k https://127.0.0.1:3000/health
 curl -k https://127.0.0.1:3200/health
 ```
 
-   Until your registry row is in (operator guide, step 9), the door refuses
-   to boot: the journal shows `Registry failed: ... publicKey is still
-   "<fill in>"` every five seconds and both health calls get nginx's 502.
-   Expected; the NAT, port 80 and the certificate do not need the door.
-   With the row pulled and the door restarted, the journal shows the four
-   boot lines, and health answers 503 `degraded` with `worker: null` until
-   the worker is up; `-k` only because the certificate names the public IP,
-   not 127.0.0.1. From your own machine,
-   `curl https://<doorman static ip>:3000/health` verifies the certificate.
+   The door boots whether or not your own registry row is in yet, since
+   every row of the committed registry is filled: the journal shows the
+   four boot lines, and health answers 503 `degraded` with `worker: null`
+   until the worker is up; `-k` only because the certificate names the
+   public IP, not 127.0.0.1. With your row pulled and the door restarted
+   (operator guide, step 9), the boot line names the new count. From your
+   own machine, `curl https://<doorman static ip>:3000/health` verifies
+   the certificate.
 
 6. The worker, per the operator guide. Once it runs, both health answers
    carry the worker's own health and the status turns `ok`. The address
@@ -319,7 +328,9 @@ Checking later: `sudo nft list quota inet doorman egress-month`,
 
 ## Updating
 
-As `doorman`, `git pull` in `/opt/doorman/doormansoftware`, `npm ci` when
+The doorman line of "The doorman VM" above, with nothing after the script
+name, does all of this and prints the result. By hand: as `doorman`,
+`git pull` in `/opt/doorman/doormansoftware`, `npm ci` when
 `package-lock.json` changed, then `sudo systemctl restart doorman`; when the
 pull touched `deploy/`, `sudo sh scripts/install-system-files.sh` instead,
 which restarts the door itself. A registry change arrives the same way, in
@@ -361,6 +372,8 @@ src/
 scripts/
   setup.js                       once, on the VM: writes .env with WORKER_IP
   install-system-files.sh        puts deploy/ in place, reloads, restarts (as root)
+  bootstrap-project.sh           Cloud Shell: the project side, operator guide steps 2 and 5
+  bootstrap-doorman.sh           the doorman VM: step 3, then every update (as root)
 network/
   testnet.env                    every value that is the same on every doorman, committed
   testnet.registry.json          the registry copy, the same file as anossoftware's, committed

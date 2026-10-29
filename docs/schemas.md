@@ -247,3 +247,228 @@ literally, the simplest thing was chosen and is recorded here; nothing in
   status; the `ok` rule compares the status the worker answered with,
   so a worker answering 503 `degraded` with a body makes the doorman
   `degraded` with that body embedded.
+
+## 2. Bootstrap build 1 (2026-10-29)
+
+Built 2026-10-29 straight from
+`~/Desktop/Z-TestNet/forclaude/bootstrap-build-1-code-ready.md` (FINAL,
+decided in its planning chat): one script per machine for onboarding a
+validator, replacing the paste-by-paste walkthrough of the operator guide
+with one pasted line per machine. This repo holds two of the three
+scripts; anossoftware holds the worker's (its `docs/schemas.md`, section
+15). The operator guide, `guides/operator-guide.md` beside the repos, was
+rewritten in two parts: Part A, the visit as it runs with the scripts,
+and Part B, the same work by hand, the fallback. Nothing about the
+servers, the protocol, the registry, the units, the env files or the
+existing scripts changed. No check ran but `sh -n` on each script:
+validator 5's onboarding visit is the first run and the test.
+
+### 2.1 The decisions, as they apply to the scripts
+
+- **One re-runnable script per machine.** `scripts/bootstrap-project.sh`
+  in Cloud Shell does the guide's steps 2 and 5 (the network and Cloud
+  KMS); `scripts/bootstrap-doorman.sh` on the doorman VM does step 3,
+  then 9.2 (also 11.2) on every later run; anossoftware's
+  `scripts/bootstrap-worker.sh` does steps 4, 6, 7, 8, then 9 and 10,
+  then 11. Each does what is still missing and answers `already` for
+  what is done; the same pasted line runs the script every time, so a
+  re-run always runs the latest script and nothing is cloned into the
+  login user's home. The keyholder GUI moved to the front of the visit,
+  so its three values exist before any VM command.
+- **How a script reaches a machine.** One pasted line that downloads it
+  from the public repo with `curl -fsSLO` and runs it with `sh` (`sudo sh`
+  on a VM), the same line on every run. No dollar sign in any pasted
+  line; the scripts themselves use shell variables freely.
+- **Arguments.** Named flags, `--name value`, parsed by a `while` over the
+  arguments with a `case`; a flag with no value, an unknown flag or a flag
+  given twice fails the argument check, and every value is checked for
+  shape before anything else happens. `bootstrap-project.sh --zone
+  --doorman-ip --id`, all three required on every run (no machine file).
+  `bootstrap-doorman.sh --worker-ip --doorman-ip --email`: each required
+  until its value is on the machine (`.env`'s `WORKER_IP`, a non-empty
+  `/etc/doorman/tls/fullchain.pem`, `/root/.acme.sh/acme.sh`), and a
+  value that is given must match what is on disk or what the metadata
+  server says, else the argument check fails naming both. So every later
+  run is the line with nothing after the script name.
+- **What the scripts work out themselves.** Cloud Shell: the project id
+  from gcloud's config (the pasted line starts with `gcloud config set
+  project`; no project set is an argument failure). The VMs: their own
+  name, the external IP, the project id and the zone from the metadata
+  server; the region from the zone; a VM script refuses to run on the
+  wrong VM. The Cloud Shell script cross-checks the doorman IP against
+  the doorman VM's external IP and requires the worker to have none; the
+  worker's service account comes from its describe. The KMS key is always
+  in the VM's own region: Cloud HSM is available in every regional
+  location.
+- **Logs and the screen.** `exec 3>&1` keeps the screen; everything else
+  goes to the log (`./bootstrap-project.log` in Cloud Shell's working
+  directory, `/var/log/doorman-bootstrap.log` on the doorman, mode 0600),
+  each run under a header `=== <script> <UTC time> <arguments> ===`. The
+  screen gets one line per guide point, `<number> <name>: <result>`, with
+  `already` when nothing had to be done, and a final line: `done ...` or
+  `failed at step <number> (<name>): see <log>`, the last five log lines
+  before it. An argument failure is `failed at the argument check:
+  <reason>`. The look points (2.2, 2.9, 3.1) print a line only where
+  they yield a value.
+- **No prompt anywhere.** `--quiet` on every gcloud command that changes
+  something, `DEBIAN_FRONTEND=noninteractive` for apt, `ssh-keygen -N ''`
+  for Cloud Shell's key, the firewall delete without its Y/n question.
+- **Service users.** Commands the guide runs as `doorman` run the same
+  way, through `sudo -iu doorman bash -c '...'`; every git command in the
+  repo runs as `doorman`, since git as root in a directory owned by
+  another user refuses with "dubious ownership".
+- **Nothing private.** The doorman script reads `WORKER_IP` from `.env`
+  and `ACCOUNT_EMAIL` from acme.sh's `account.conf`, each with `sed -n` on
+  the one line, never by printing a file; it never reads the TLS key,
+  and acme.sh prints only the certificate, which is public.
+- **The guide.** One file, two parts. Part A: the visit, A1 to A7, the
+  three pasted lines and the two SSH lines with placeholders. Part B: the
+  eleven steps with their step and point numbers unchanged, so a script's
+  `failed at step 3.5` points at B's 3.5; each step's pastes merged into
+  one, or two where they depend on a look; the prose cut to the skip
+  condition and the success text; the keyholder GUI in step 1; step 5's
+  key in the VM's region alone.
+- **READMEs, the least.** This README's "The doorman VM" opens with the
+  doorman line; its step 5 no longer describes validator 1's unfilled
+  row (the door boots whether or not the new operator's row is in, since
+  every committed row is filled); "Updating" starts with the short line;
+  "Layout" lists the two scripts. The "Next" lines of `setup.js` stay.
+
+### 2.2 Files
+
+New: `scripts/bootstrap-project.sh`, `scripts/bootstrap-doorman.sh`.
+Changed: `README.md` (the three edits above), this file. Outside the
+repo: `guides/operator-guide.md` rewritten; anossoftware's worker script,
+README and design record; keyholdersoftware's README, one sentence.
+
+`bootstrap-project.sh`: Cloud Shell, as the operator, `sh`, log
+`./bootstrap-project.log`. Flags `--zone` (`us-east1-b`-shaped; the region
+is the zone without its last `-x`), `--doorman-ip` (a public dotted quad),
+`--id` (a positive integer). Argument check: a project set, both VMs
+describable in the zone, the doorman's `natIP` equal to `--doorman-ip`,
+the worker's empty. Step lines, in order: `2.1 project`, `2.2 look`
+(worker internal IP, service account), `2.3 static IP`, `2.4 IP
+forwarding on doorman`, `2.5 tags`, `2.6 firewall` (the four creates
+where missing, then every other rule of the default network deleted in
+one `--quiet` delete, named), `2.7 route worker-egress`, `2.8 scope
+cloud-platform on worker` (stop, set, start, the internal IP read again),
+`2.9 look again` (everything read back; a difference fails naming it),
+`2.10 ssh key`, `2.11 budget` (a Console page), `5.2 KMS API`, `5.2 key
+ring anos-testnet in <region>` (up to six tries, five seconds apart, after
+the API was just enabled), `5.2 key keyholder-<N>` (must be
+`ENCRYPT_DECRYPT HSM`), `5.2 binding` (on every run; idempotent), `5.3 KMS
+key`. Then `Values for the next lines` (worker internal IP, service
+account, KMS key), the doorman's SSH line and the doorman line with the
+values filled in, and `done: project <id> is ready for the doorman (step
+3) and the worker (step 4)`.
+
+`bootstrap-doorman.sh`: the doorman VM, root, log
+`/var/log/doorman-bootstrap.log`. Flags `--worker-ip` (a private dotted
+quad, `setup.js`'s rule), `--doorman-ip` (equal to the VM's external IP),
+`--email` (one `@`, a dot after it). Step lines: `3.1 look` (Debian 13
+required, unattended-upgrades reported), `3.2 packages` (node 24, nginx,
+fail2ban, nftables, git; NodeSource's setup script for node), `3.3 user
+and repo` (user, clone, `npm ci`, `.env` through `npm run setup`), `3.4
+system files, first pass` (the install script when any of its products is
+missing), `3.5 certificate` (acme.sh 3.1.6 cloned and installed when
+missing, Let's Encrypt as default CA, `--issue` for the IP on the
+shortlived profile with exit code 2 counting as issued, `--install-cert`
+with the guide's reload command; `already, valid to <date>` when the
+chain exists), `3.6 system files, second pass and the door` (the install
+script when the TLS site is missing; the door's `Registry` boot line from
+its journal, a `Registry failed` line failing the step; both health
+answers through nginx as `<port>: <code> <status> (worker <null|present>)`,
+503 with the worker null being the expected answer until the worker
+runs), `3.7 certificate as the world sees it` (curl to the local port with
+`--connect-to`, the chain checked against the IP in the URL), `9.2 pull
+and restart` (only when the repo existed before the run: `git pull
+--ff-only`, `npm ci` when `package-lock.json` changed, the install script
+when `deploy/` or itself changed, else a restart; nothing when HEAD did
+not move). Done lines: `done: doorman for worker <ip> is up; the door
+answers 503 degraded until the worker runs (step 10)` on a run that did
+step 3 work; `done: doorman on registry <16 hex>, <n> active` when the
+pull moved HEAD; `done: nothing to do; registry <16 hex>, <n> active,
+certificate <d> days left` otherwise.
+
+### 2.3 Notes from the build
+
+Where the plan was silent, the simplest thing was chosen and is recorded
+here; nothing in 2.1 was changed.
+
+- **One gcloud describe per field** (`vm_value VM FIELD`) rather than one
+  multi-field `value()` format: with tab-separated output an empty middle
+  field (the worker's `natIP`) collapses under the shell's field
+  splitting, so a single call per field is the unambiguous form. About
+  fifteen more gcloud calls, a second or two each.
+- **`--quiet` on every gcloud command that changes something**, not only
+  the ones known to ask; it is harmless on the rest.
+- **The look of 2.2** is written to the log as the guide's tables (the
+  addresses, the firewall rules of the default network, the routes to
+  `0.0.0.0/0`) plus the values the script keeps, labeled; 2.2 also fails
+  when the worker has no internal IP or no service account, since the
+  binding of 5.2 would fail later with a worse message.
+- **2.9 compares the route as one string**, `0.0.0.0/0 doorman 900
+  worker`, the guide's own success line, and the default network's rule
+  names, sorted, against exactly the four. The firewall filter is
+  `network ~ /networks/default$` for the look, the delete and the check.
+- **2.10 creates `~/.ssh` (mode 700)** before `ssh-keygen`, which refuses
+  a missing directory; the key is `rsa`, 3072 bits, what gcloud makes.
+- **5.2's key ring loop** tries a describe and then a create on each of up
+  to six passes, five seconds apart, since right after the API is enabled
+  a describe fails for the same few seconds as a create; a key describe
+  that fails is read as "missing" and the create's own error is the
+  failure if it was something else. **5.3** checks that the assembled
+  name is a line of `kms keys list` (`grep -Fx`), which is how the worker
+  script assembles `KMS_KEY_NAME` from the metadata server.
+- **The Cloud Shell log is 0600 too**, created in the working directory
+  before the screen is redirected, and the script does no root check (it
+  runs as whoever Cloud Shell is, root in safe mode).
+- **The doorman script exports `HOME=/root`** so acme.sh installs under
+  `/root` whether or not `sudo` set `HOME`, and `DEBIAN_FRONTEND`.
+- **NodeSource's setup script is downloaded to a temporary file and then
+  run** instead of piped into bash: a pipe hides a failed download (bash
+  exits 0 on empty input and `apt-get install nodejs` would then install
+  Debian's node), and `node -v` is checked for `v24` afterwards. The
+  temporary directory is removed by the EXIT trap.
+- **"Installed" for the apt packages is `dpkg-query -W -f='${Status}'`**;
+  node is `node -v` starting `v24`; nginx's version is read from
+  `/usr/sbin/nginx -v`.
+- **Journal reads are scoped to the door's current systemd invocation**
+  (`journalctl _SYSTEMD_INVOCATION_ID=<id>`), so a `Registry` line of an
+  earlier boot is never read as this one's; after a restart the script
+  waits up to ten seconds for the new line. A door up for weeks may have
+  its boot line rotated out of the journal: then the step line says
+  `boot line no longer in the journal` and the registry hash and count
+  come from the health answer, parsed by node from the JSON, which is
+  also where the done lines take them.
+- **`git rev-parse` and `git diff` run as `sudo -u doorman git -C
+  <repo>`**, without the login shell, so their output is captured clean;
+  the clone, `npm ci`, `npm run setup` and the pull keep the guide's
+  `sudo -iu doorman bash -c '...'`.
+- **3.6 restarts a door that is not active** even when nothing was
+  installed in this run (a door someone stopped), so the "nothing is
+  restarted" rule of 9.2 concerns only whether HEAD moved.
+- **3.5 skips the acme.sh clone when `/root/acme.sh-src/acme.sh` exists**
+  (a run that stopped between the clone and the install) and compares
+  `--email` with `ACCOUNT_EMAIL` only when `account.conf` has the line.
+- **The health line is `<port>: <code> <status> (worker <null|present>)`**
+  for both ports; the `Registry` boot line is quoted from the journal as
+  it is. A health answer that is nginx's 502 or no answer is retried for
+  up to ten seconds before it fails the step.
+- **Which done line:** the first-run line when any point of step 3 did
+  work in this run, the registry line when the pull moved HEAD, else
+  nothing to do.
+- **The argument check reads the metadata server before the machine
+  files**; a VM that cannot reach it fails the argument check, as does a
+  doorman VM with no external IP.
+- **The guide's step 2:** the 2.2 look's `echo "project: $(gcloud config
+  get-value project)"` became a plain `gcloud config get-value project`
+  line, since no pasted line may contain a dollar sign; the delete of 2.6
+  carries `--quiet`, since a multi-line paste cannot answer the Y/n
+  question (the next pasted line would be read as the answer). Part A
+  shows the re-run lines in full, with nothing after the script name, so
+  they can be pasted as they stand.
+- **`/etc/nftables.conf` is in 3.4's product list** as the plan says,
+  though Debian's nftables package ships one; the other four products
+  decide the first pass on a fresh VM, and all five exist on an installed
+  one.
