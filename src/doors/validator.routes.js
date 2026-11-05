@@ -54,6 +54,7 @@ export const validatorRoutes = Object.freeze([
   // The signed reads: the account level and the attestor level.
   { method: 'POST', path: '/get-account', maxBytes: 16 * 1024, check: signedReadCheck },
   { method: 'POST', path: '/list-transactions', maxBytes: 16 * 1024, check: signedReadCheck },
+  { method: 'POST', path: '/list-escrows', maxBytes: 16 * 1024, check: signedReadCheck },
   { method: 'POST', path: '/list-assisted-transfers', maxBytes: 16 * 1024, check: signedReadCheck },
   { method: 'POST', path: '/list-disputed-escrows', maxBytes: 16 * 1024, check: signedReadCheck },
 

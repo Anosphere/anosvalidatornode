@@ -62,7 +62,7 @@ the doorman VM is the test.
   dynamic. fail2ban reads nginx's access log (`deploy/fail2ban/`).
 - **Body caps per route.** Port 3000: 96 KB for `/create-account` and
   `/transaction-approval`; 64 KB for the eight wallet submission routes,
-  `/attachment-approval` and both proof routes; 16 KB for the four signed
+  `/attachment-approval` and both proof routes; 16 KB for the five signed
   reads; 4 KB for `/ready-announcement`; 256 KB for `/official-list` and
   `/final-declaration`. Port 3200: 32 KB for every route. nginx caps each
   port at its largest route (256k, 32k); the door caps per route with
