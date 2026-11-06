@@ -112,7 +112,7 @@ The validator door (port 3000; KB is 1024 bytes):
 | `/assisted-transfer-cancel` | 64 KB | follow-up, kind `assistedTransferCancel`, signer `accountId` |
 | `/guardian-vote` | 64 KB | follow-up, kind `guardianVote`, signer `guardianId` |
 | `/escrow-signature` | 64 KB | follow-up, kinds `escrowSuccess`, `escrowCancel`, `escrowDispute` (signer `accountId`) and `escrowVerdict` (signer `arbitratorId`) |
-| `/get-account`, `/list-transactions`, `/list-escrows`, `/get-assisted-transfer`, `/list-assisted-transfers`, `/list-disputed-escrows` | 16 KB | the signed envelope with `accountId`, both signatures (400 `bad request shape`); `ecdsa` decodes as P-256 and `mldsa` as ML-DSA-87 (401 `bad signature`). `path`, `timestamp`, the account and the nonce are the worker's |
+| `/get-account`, `/list-transactions`, `/list-escrows`, `/get-assisted-transfer`, `/get-locked-transfer`, `/list-assisted-transfers`, `/list-disputed-escrows` | 16 KB | the signed envelope with `accountId`, both signatures (400 `bad request shape`); `ecdsa` decodes as P-256 and `mldsa` as ML-DSA-87 (401 `bad signature`). `path`, `timestamp`, the account and the nonce are the worker's |
 | `/transaction-approval` | 96 KB | the worker's shape; `originatingValidator` is an active registry row; `signature.key` decodes as P-256 and verifies against that row's key over the canonical payload |
 | `/proof-of-acceptance` | 64 KB | as above, and every receipt has the approved-receipt shape and a decoding `signature.key` (receipts are not verified at the door) |
 | `/attachment-approval` | 64 KB | as `/transaction-approval`, with the attachment approval's shape |
