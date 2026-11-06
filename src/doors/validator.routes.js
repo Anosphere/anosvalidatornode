@@ -56,6 +56,7 @@ export const validatorRoutes = Object.freeze([
   { method: 'POST', path: '/list-transactions', maxBytes: 16 * 1024, check: signedReadCheck },
   { method: 'POST', path: '/list-escrows', maxBytes: 16 * 1024, check: signedReadCheck },
   { method: 'POST', path: '/get-assisted-transfer', maxBytes: 16 * 1024, check: signedReadCheck },
+  { method: 'POST', path: '/get-locked-transfer', maxBytes: 16 * 1024, check: signedReadCheck },
   { method: 'POST', path: '/list-assisted-transfers', maxBytes: 16 * 1024, check: signedReadCheck },
   { method: 'POST', path: '/list-disputed-escrows', maxBytes: 16 * 1024, check: signedReadCheck },
 

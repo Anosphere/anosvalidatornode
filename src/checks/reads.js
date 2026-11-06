@@ -3,9 +3,10 @@ import { refuse } from '../util/result.js';
 import { decodesAsSignature, parseSignedRequest } from './signed-request.js';
 
 /**
- * The door's check on the six signed reads of the validator: /get-account,
- * /list-transactions, /list-escrows and /get-assisted-transfer (the account
- * level) and /list-assisted-transfers and /list-disputed-escrows (the attestor level). The envelope with
+ * The door's check on the seven signed reads of the validator: /get-account,
+ * /list-transactions, /list-escrows, /get-assisted-transfer and
+ * /get-locked-transfer (the account level) and /list-assisted-transfers and
+ * /list-disputed-escrows (the attestor level). The envelope with
  * accountId as the signer field and both signatures (parseSignedRequest,
  * 400 bad request shape), then signatures.ecdsa decodes as a P-256
  * signature and signatures.mldsa as an ML-DSA-87 one, else 401 bad
