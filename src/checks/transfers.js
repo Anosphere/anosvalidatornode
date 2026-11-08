@@ -1,6 +1,6 @@
 import { isObject } from '../util/is-object.js';
 import { refuse } from '../util/result.js';
-import { ANY_TWO_PAIRS, PAIR_ONE_AND_WALLET, checkSignaturesDecode } from './account-signatures.js';
+import { ANY_TWO_PAIRS, checkSignaturesDecode } from './account-signatures.js';
 
 /**
  * The door's checks on the three transaction routes a wallet submits to
@@ -36,14 +36,14 @@ const FUND_PROPOSAL = 'fundProposal';
 
 /**
  * The five transfer types, each with the signing rule its signatures must
- * meet (the worker's TRANSFER_TYPES, reduced to the rule): pair 1 and the
- * wallet pair for an assisted transfer, any two pairs for the rest.
+ * meet (the worker's TRANSFER_TYPES, reduced to the rule): any two pairs
+ * for every one of them since 2026-11-07.
  */
 const TRANSFER_RULES = new Map([
   [ANOS_TRANSFER, ANY_TWO_PAIRS],
   [GUARDED_ANOS_TRANSFER, ANY_TWO_PAIRS],
   [VAULT_ANOS_TRANSFER, ANY_TWO_PAIRS],
-  [ASSISTED_ANOS_TRANSFER, PAIR_ONE_AND_WALLET],
+  [ASSISTED_ANOS_TRANSFER, ANY_TWO_PAIRS],
   [ESCROW_TRANSFER, ANY_TWO_PAIRS],
 ]);
 

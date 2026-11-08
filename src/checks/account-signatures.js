@@ -3,7 +3,7 @@ import { decodesAsSignature } from './signed-request.js';
 
 /**
  * Signatures an account makes over a payload: the three key pairs and the
- * two signing rules, copied from anossoftware's
+ * signing rule, copied from anossoftware's
  * src/accounts/account-signatures.js, and the door's half of its
  * verifyAccountSignatures. The keys to verify with live in the worker's
  * accounts table, never in the object itself, so the door walks the pairs
@@ -37,31 +37,23 @@ export const SIGNING_PAIRS = Object.freeze([
 ]);
 
 /**
- * Signing rule: at least two of the three pairs, both keys of each. Plain,
- * guarded, vault and escrow transfers, transfers to the fund, fund proposals
- * and every follow-up use it.
+ * Signing rule: at least two of the three pairs, both keys of each. Every
+ * transfer kind, transfers to the fund, fund proposals and every follow-up
+ * use it: the one rule since 2026-11-07, when the assisted transfer's own
+ * rule, pair one and the wallet pair, was dropped.
  */
 export const ANY_TWO_PAIRS = 'anyTwoPairs';
-
-/**
- * Signing rule: pair 1 and the wallet pair, all four keys. A pair 2 also
- * present is checked like any other and accepted. Assisted transfers use it.
- */
-export const PAIR_ONE_AND_WALLET = 'pairOneAndWallet';
 
 /** How many of SIGNING_PAIRS the ANY_TWO_PAIRS rule needs. */
 const MIN_SIGNING_PAIRS = 2;
 
-/** The pairs the PAIR_ONE_AND_WALLET rule needs: pair 1 and the wallet pair. */
-const PAIR_ONE_AND_WALLET_PAIRS = [SIGNING_PAIRS[0], SIGNING_PAIRS[2]];
-
 /**
  * verifyAccountSignatures without an account. Checks `signatures`, the
  * signatures object of a transfer or a follow-up, under `rule`
- * (ANY_TWO_PAIRS or PAIR_ONE_AND_WALLET): for every pair with a signature
- * present, both halves are present, each a string, each decoding for its
- * algorithm; then the rule says which pairs had to be among them. Returns
- * null when it all holds, else the worker's reason, safe to send back.
+ * (ANY_TWO_PAIRS): for every pair with a signature present, both halves
+ * are present, each a string, each decoding for its algorithm; then the
+ * rule says which pairs had to be among them. Returns null when it all
+ * holds, else the worker's reason, safe to send back.
  */
 export function checkSignaturesDecode(signatures, rule) {
   const signed = [];
@@ -85,14 +77,6 @@ export function checkSignaturesDecode(signatures, rule) {
   if (rule === ANY_TWO_PAIRS) {
     if (signed.length < MIN_SIGNING_PAIRS) {
       return `signatures must come from at least ${MIN_SIGNING_PAIRS} of the key pairs key1, key2 and walletKey`;
-    }
-    return null;
-  }
-  if (rule === PAIR_ONE_AND_WALLET) {
-    for (const pair of PAIR_ONE_AND_WALLET_PAIRS) {
-      if (!signed.includes(pair)) {
-        return `signatures must include ${pair[0].name} and ${pair[1].name}`;
-      }
     }
     return null;
   }
