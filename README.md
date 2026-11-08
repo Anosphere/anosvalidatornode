@@ -409,4 +409,6 @@ notes from the build; section 2, the bootstrap scripts; section 3,
 the validator's catch-up build; section 4, "The assisted signing rule
 (2026-11-07)", the one signing rule, any two pairs, for every transfer
 type; section 5, "The break-glass transfer (2026-11-08)", the second rule,
-the break-glass pair alone, for the sixth transfer type and its cancel.
+the break-glass pair alone, for the sixth transfer type and its cancel;
+section 6, "The DAO stake read (2026-11-08)", the one public read,
+`/list-dao-stakes`, let through the validator door.

@@ -62,8 +62,9 @@ the doorman VM is the test.
   dynamic. fail2ban reads nginx's access log (`deploy/fail2ban/`).
 - **Body caps per route.** Port 3000: 96 KB for `/create-account` and
   `/transaction-approval`; 64 KB for the nine wallet submission routes,
-  `/attachment-approval` and both proof routes; 16 KB for the five signed
-  reads; 4 KB for `/ready-announcement`; 256 KB for `/official-list` and
+  `/attachment-approval` and both proof routes; 16 KB for the seven signed
+  reads; 4 KB for `/ready-announcement` and the public read
+  `/list-dao-stakes` (section 6); 256 KB for `/official-list` and
   `/final-declaration`. Port 3200: 32 KB for every route. nginx caps each
   port at its largest route (256k, 32k); the door caps per route with
   `express.raw`, answering 413 `request body too large` either way.
@@ -756,8 +757,11 @@ moves on.
   '/list-dao-stakes', maxBytes: 4 * 1024, check: publicReadCheck }`.
 - `README.md`: a `/list-dao-stakes` row after the signed-reads row of the
   validator door's table; the Layout line of `checks/reads.js`, the seven
-  signed reads and the one public read.
-- `docs/schemas.md`: this section.
+  signed reads and the one public read; and, on the user's word (6.2),
+  the design record paragraph names this section.
+- `docs/schemas.md`: this section; and, on the user's word (6.2), 1.1's
+  body caps bullet counts the seven signed reads and names this route's
+  4 KB.
 
 ### 6.2 Notes from the build
 
@@ -790,14 +794,16 @@ here; nothing in 6.1 was changed.
 - **The README row** says what the door checks (an object, 400 `bad
   request shape`), that the read is public and since when, and that the
   stakes are the worker's, in the shape of the table's other rows.
-- **Doc spots beyond the plan's list, found and left for the user's
-  word**, as the validator's 23.4 had two: the README's design record
-  paragraph, which lists sections 1 to 5 of this file and not this one;
-  and 1.1's body caps bullet above, which has said "16 KB for the five
-  signed reads" since build 1, while the table has had seven, and which
-  names neither this route's 4 KB nor the catch-up build's. Nothing the
-  change made false was found: a search for "five signed reads", "seven
-  signed reads", "public" and "unsigned" across `src/`, the README and this
-  file found only the Layout line the plan names and the bullet.
+- **Two doc spots beyond the plan's list were fixed on the user's word**,
+  as the validator's 23.4 had two, after the step was committed: the
+  README's design record paragraph, which listed sections 1 to 5 of this
+  file, now names this one; and 1.1's body caps bullet above, which had
+  said "16 KB for the five signed reads" since build 1 while the table had
+  seven, now counts seven and names this route's 4 KB. The bullet still
+  does not name the catch-up build's 4 KB routes, which are older than
+  this step and were left alone. Nothing else the change made false was
+  found: a search for "five signed reads", "seven signed reads", "public"
+  and "unsigned" across `src/`, the README and this file found only the
+  Layout line the plan names and the bullet.
 - **Checks.** `node --check` passed on the two files. No door was started,
   nothing was imported from the shell and no test script was written.
