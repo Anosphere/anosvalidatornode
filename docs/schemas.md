@@ -472,3 +472,76 @@ here; nothing in 2.1 was changed.
   though Debian's nftables package ships one; the other four products
   decide the first pass on a fresh VM, and all five exist on an installed
   one.
+
+## 3. Catch-up, ignore votes and joining (2026-11-07)
+
+The doorman's part of anossoftware's catch-up build, from
+`~/Desktop/Z-TestNet/forclaude/validator-catch-up-plan-1.md` (FINAL,
+2026-11-07; the validator's `docs/schemas.md` section 19): route entries
+in `src/doors/validator.routes.js` for the seven new validator-to-validator
+messages, so they pass the door. Step 1, built 2026-11-07: `/chain-links`.
+Step 2, built the same day: the six others. Nothing else in the door
+changes. The relay
+(`src/door/forward.js`) passes a worker's answer whole, so a chunk of a
+hundred account creations, about six megabytes, passes as it is; health
+needs nothing, since the worker's new fields (`chain`, `leader`, `ignored`,
+`counted`) ride inside `worker`; the registry file is not changed by the
+build. No check ran but `node --check` on the two files: the rig on the
+Mac has no doorman, and the relaunch is the test.
+
+### 3.1 The entries
+
+| Path | Cap | Sender field | Step |
+| --- | --- | --- | --- |
+| `/chain-links` | 4 KB | `validator` | 1 |
+| `/ignore-vote` | 4 KB | `startedBy` | 2 |
+| `/proof-of-ignore-vote` | 64 KB | `startedBy` | 2 |
+| `/no-answer-report` | 4 KB | `reporter` | 2 |
+| `/join-request` | 4 KB | `validator` | 2 |
+| `/held-rows` | 4 KB | `validator` | 2 |
+| `/ready` | 4 KB | `validator` | 2 |
+
+Each entry runs the worker's shape function for its message, copied into
+`src/checks/validator-messages.js` with its reasons, then `fromValidator`
+with the sender field: the sender an active row of the registry copy, its
+signature verifying over the canonical payload. Whether the sender is
+counted, the leader or the next in the ring is the worker's, as it is for
+the leader calls; a proof's receipts decode as `proofOfAcceptanceCheck`
+does.
+
+### 3.2 Notes from the build
+
+Step 1:
+
+- **The copied shape of the chunk read checks `limit` as a positive
+  integer only.** Its upper bound, `CHAIN_CHUNK_LINKS`, is a validator
+  variable the door does not have; the worker checks it right after the
+  shape, so the shape function could be copied as it is.
+- **An ignored validator's chunk read passes the door** as it passes the
+  worker: `fromValidator` requires an active row, which is membership, and
+  a joiner is ignored while it catches up.
+- **The README's route table** gained the row; the layout line of
+  `validator-messages.js` now counts the catch-up build's routes.
+
+Step 2:
+
+- **The shapes are the worker's six, copied with their reasons**: the vote
+  request and the vote receipt (inside a proof) from `src/votes/
+  votes.messages.js`, the proof and the report from the same file, the
+  three join messages from `src/validators/join.service.js`, with the
+  worker's small helpers (`checkIdList`, the join envelope, the tail
+  fields) copied beside them. The worker's lists are constants here
+  (`ACTIONS`, `VOTES`, `HELD_ROW_TABLES`), as `ACCOUNT_TYPES` is in
+  `create-account.js`.
+- **The proof's receipts decode as `proofOfAcceptanceCheck` does**: the
+  vote receipt's shape, then `signature.key` as a P-256 signature; nothing
+  is verified, and `vote` yes or no is not read.
+- **What stays the worker's**: whether the starter may start the vote (the
+  leader, or the next in the ring), the floor, the vote itself, the leader
+  of a join, the hold, the tails, the cap on `limit` of a held rows
+  request, and the 503 `not counted yet` a joiner answers to every other
+  POST, which the door relays as any other answer.
+- **The caps** follow the plan's table: 64 KB for the proof (a vote with
+  24 receipts measures about 12 KB), 4 KB for the rest. The six are under
+  1 KB each; a held rows page of a hundred rows with their attachments is
+  an answer, which the relay passes whole.

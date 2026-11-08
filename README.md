@@ -120,6 +120,12 @@ The validator door (port 3000; KB is 1024 bytes):
 | `/ready-announcement` | 4 KB | the leader call's shape; `leader` is an active row; its signature verifies. Whether it is the leader is the worker's |
 | `/official-list` | 256 KB | the same, with `transactionIds` an array of digests (about 3,900 ids fit) |
 | `/final-declaration` | 256 KB | the same, with `nextLeader` a positive integer |
+| `/chain-links` | 4 KB | the chunk read's shape (`validator`, `afterPosition` an integer of 0 or more, `limit` a positive integer, `sentAt`); `validator` is an active row; its signature verifies. The cap on `limit` and whether the asker may ask are the worker's. The answer, up to about six megabytes for a hundred account creations, is relayed whole (the catch-up build, `docs/schemas.md` section 3) |
+| `/ignore-vote` | 4 KB | the vote request's shape (`action` ignore or include, `validatorIds` distinct and ascending, `voteId`, `startedBy`, `sentAt`); `startedBy` is an active row; its signature verifies. Whether it may start the vote, the floor and the vote itself are the worker's |
+| `/proof-of-ignore-vote` | 64 KB | the proof's shape (`voteId`, `request` an object with payload and signature, `receipts`, `startedBy`, `sentAt`); `startedBy` as above; every receipt has the vote receipt's shape and a decoding `signature.key` (receipts are not verified at the door) |
+| `/no-answer-report` | 4 KB | the report's shape (`validatorIds` distinct and ascending, `reporter`, `sentAt`); `reporter` is an active row; its signature verifies |
+| `/join-request`, `/ready` | 4 KB | the shape (`validator`, `tailPosition` an integer of 0 or more, `tailRecordHash`, `sentAt`); `validator` is an active row, ignored or not; its signature verifies. The leader, the hold and the tails are the worker's |
+| `/held-rows` | 4 KB | the shape (`validator`, `table` one of the five holding tables, `afterTransactionId` a string or null, `limit` a positive integer, `sentAt`); `validator` as above. The cap on `limit` and the join in progress are the worker's; the page, up to a hundred rows with their attachments, is relayed whole |
 
 The keyholder door (port 3200), every route capped at 32 KB, shape and
 size only, since the keys of every level live elsewhere:
@@ -367,7 +373,7 @@ src/
   checks/transfers.js            /anos-transfer, /transfer-to-fund, /fund-proposal
   checks/follow-ups.js           the four follow-up routes and the seven kinds
   checks/reads.js                the five signed reads
-  checks/validator-messages.js   the seven validator routes, verified against the registry
+  checks/validator-messages.js   the fourteen validator routes (seven, plus the catch-up build's seven), verified against the registry
   checks/keyholder.js            the nine keyholder routes by level
 scripts/
   setup.js                       once, on the VM: writes .env with WORKER_IP
@@ -396,4 +402,6 @@ docs/
 
 `docs/schemas.md`: section 1, "Doorman build 1 (2026-10-27)", holds the
 decisions as they apply to the code, the files and variables, and the
-notes from the build.
+notes from the build; section 2, the bootstrap scripts; section 3,
+"Catch-up, ignore votes and joining (2026-11-07)", the route entries of
+the validator's catch-up build.

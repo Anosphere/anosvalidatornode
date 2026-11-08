@@ -13,11 +13,18 @@ import { signedReadCheck } from '../checks/reads.js';
 import { anosTransferCheck, fundProposalCheck, transferToFundCheck } from '../checks/transfers.js';
 import {
   attachmentApprovalCheck,
+  chainLinksCheck,
   finalDeclarationCheck,
+  heldRowsCheck,
+  ignoreVoteCheck,
+  joinRequestCheck,
+  noAnswerReportCheck,
   officialListCheck,
   proofOfAcceptanceCheck,
   proofOfAttachmentAcceptanceCheck,
+  proofOfIgnoreVoteCheck,
   readyAnnouncementCheck,
+  readyCheck,
   transactionApprovalCheck,
 } from '../checks/validator-messages.js';
 
@@ -31,7 +38,12 @@ import {
  * answering null or { status, reason }. The caps are generous so nothing
  * legitimate hits them: a create-account measures 57.7 KB, a transfer or
  * follow-up with three pairs 28 KB, a signed read 9.5 KB, a proof with 24
- * receipts 8.5 KB, an official list of 1000 ids 65.7 KB.
+ * receipts 8.5 KB, an official list of 1000 ids 65.7 KB, a chain chunk
+ * read, a vote request, a report, a join request, a held rows request and
+ * a ready under 1 KB each, a proof of a vote with 24 receipts about 12 KB.
+ * A worker's answer is relayed whole whatever its size (door/forward.js):
+ * a chunk of a hundred account creations, about six megabytes, passes as
+ * it is.
  */
 export const validatorRoutes = Object.freeze([
   // What a wallet submits.
@@ -68,4 +80,14 @@ export const validatorRoutes = Object.freeze([
   { method: 'POST', path: '/ready-announcement', maxBytes: 4 * 1024, check: readyAnnouncementCheck },
   { method: 'POST', path: '/official-list', maxBytes: 256 * 1024, check: officialListCheck },
   { method: 'POST', path: '/final-declaration', maxBytes: 256 * 1024, check: finalDeclarationCheck },
+
+  // The catch-up build (docs/schemas.md section 3): the chain chunk read,
+  // the votes and the report, the join.
+  { method: 'POST', path: '/chain-links', maxBytes: 4 * 1024, check: chainLinksCheck },
+  { method: 'POST', path: '/ignore-vote', maxBytes: 4 * 1024, check: ignoreVoteCheck },
+  { method: 'POST', path: '/proof-of-ignore-vote', maxBytes: 64 * 1024, check: proofOfIgnoreVoteCheck },
+  { method: 'POST', path: '/no-answer-report', maxBytes: 4 * 1024, check: noAnswerReportCheck },
+  { method: 'POST', path: '/join-request', maxBytes: 4 * 1024, check: joinRequestCheck },
+  { method: 'POST', path: '/held-rows', maxBytes: 4 * 1024, check: heldRowsCheck },
+  { method: 'POST', path: '/ready', maxBytes: 4 * 1024, check: readyCheck },
 ].map(Object.freeze));
