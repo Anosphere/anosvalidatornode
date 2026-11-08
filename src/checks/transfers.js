@@ -1,6 +1,6 @@
 import { isObject } from '../util/is-object.js';
 import { refuse } from '../util/result.js';
-import { ANY_TWO_PAIRS, checkSignaturesDecode } from './account-signatures.js';
+import { ANY_TWO_PAIRS, BREAK_GLASS_PAIR, checkSignaturesDecode } from './account-signatures.js';
 
 /**
  * The door's checks on the three transaction routes a wallet submits to
@@ -28,6 +28,9 @@ const ASSISTED_ANOS_TRANSFER = 'assistedAnosTransfer';
 /** The transactionType of an escrow transfer, out of a spending account. */
 const ESCROW_TRANSFER = 'escrowTransfer';
 
+/** The transactionType of a break-glass move: the whole balance of an account whose keys were lost with its passkey, to a new account of the same type, signed by the break-glass pair, attested by two attestors (docs/schemas.md section 5). */
+const BREAK_GLASS_TRANSFER = 'breakGlassTransfer';
+
 /** The transactionType of a stake: a transfer from a spending account to the fund, naming its purpose. */
 const TRANSFER_TO_FUND = 'transferToFund';
 
@@ -35,9 +38,10 @@ const TRANSFER_TO_FUND = 'transferToFund';
 const FUND_PROPOSAL = 'fundProposal';
 
 /**
- * The five transfer types, each with the signing rule its signatures must
+ * The six transfer types, each with the signing rule its signatures must
  * meet (the worker's TRANSFER_TYPES, reduced to the rule): any two pairs
- * for every one of them since 2026-11-07.
+ * for five of them since 2026-11-07; the break-glass pair alone for the
+ * breakGlassTransfer (2026-11-08).
  */
 const TRANSFER_RULES = new Map([
   [ANOS_TRANSFER, ANY_TWO_PAIRS],
@@ -45,9 +49,10 @@ const TRANSFER_RULES = new Map([
   [VAULT_ANOS_TRANSFER, ANY_TWO_PAIRS],
   [ASSISTED_ANOS_TRANSFER, ANY_TWO_PAIRS],
   [ESCROW_TRANSFER, ANY_TWO_PAIRS],
+  [BREAK_GLASS_TRANSFER, BREAK_GLASS_PAIR],
 ]);
 
-/** True when `transactionType` is one of the five transfer types. */
+/** True when `transactionType` is one of the six transfer types. */
 function isTransferType(transactionType) {
   return TRANSFER_RULES.has(transactionType);
 }
@@ -85,7 +90,7 @@ function checkTransferShape(body) {
   if (typeof payload.transactionId !== 'string') return 'payload.transactionId must be a string';
   if (typeof payload.previousTransactionId !== 'string') return 'payload.previousTransactionId must be a string';
   if (!isTransferType(payload.transactionType)) {
-    return `payload.transactionType must be "${ANOS_TRANSFER}", "${GUARDED_ANOS_TRANSFER}", "${VAULT_ANOS_TRANSFER}", "${ASSISTED_ANOS_TRANSFER}" or "${ESCROW_TRANSFER}"`;
+    return `payload.transactionType must be "${ANOS_TRANSFER}", "${GUARDED_ANOS_TRANSFER}", "${VAULT_ANOS_TRANSFER}", "${ASSISTED_ANOS_TRANSFER}", "${ESCROW_TRANSFER}" or "${BREAK_GLASS_TRANSFER}"`;
   }
   if (typeof payload.amount !== 'string') return 'payload.amount must be a string';
   if (typeof payload.accountIdTo !== 'string') return 'payload.accountIdTo must be a string';

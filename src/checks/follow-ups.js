@@ -1,23 +1,27 @@
 import { isObject } from '../util/is-object.js';
 import { refuse } from '../util/result.js';
-import { ANY_TWO_PAIRS, checkSignaturesDecode } from './account-signatures.js';
+import { ANY_TWO_PAIRS, BREAK_GLASS_PAIR, checkSignaturesDecode } from './account-signatures.js';
 
 /**
- * The door's checks on the four follow-up routes, /attestation,
- * /assisted-transfer-cancel, /guardian-vote and /escrow-signature. A
- * follow-up is { payload, signatures }: payload.type names its kind,
- * payload.transactionId the held transaction it attaches to, the kind's
- * signer field the signer's account id, payload.signedAt when it was
- * signed; the signatures are the signer's account keys, any two pairs.
+ * The door's checks on the five follow-up routes, /attestation,
+ * /assisted-transfer-cancel, /break-glass-cancel, /guardian-vote and
+ * /escrow-signature. A follow-up is { payload, signatures }: payload.type
+ * names its kind, payload.transactionId the held transaction it attaches
+ * to, the kind's signer field the signer's account id, payload.signedAt
+ * when it was signed; the signatures are the signer's account keys under
+ * the kind's rule, any two pairs, or the break-glass pair alone for the
+ * break-glass cancel (2026-11-08, docs/schemas.md section 5).
  *
  * followUpCheck(kinds) builds the check of one route from the kinds its
- * worker handler allows. Each kind is { type, signerField } as the worker's
- * kind modules export them (src/assisted-transfers/, src/fund/guardian-vote.js,
+ * worker handler allows. Each of the eight kinds is { type, signerField }
+ * and, where the kind has a rule of its own, rule, as the worker's kind
+ * modules export them (src/assisted-transfers/, src/fund/guardian-vote.js,
  * src/escrow/); what else a kind has there (its table, its stake, its own
  * fields and checks, its effect) stays on the worker. The shape is the
  * common part of attachments.service.js checkAttachmentShape, with the same
- * reasons; then account-signatures.js checkSignaturesDecode. The held row,
- * the signer's account and stake and the verification against its keys are
+ * reasons; then account-signatures.js checkSignaturesDecode under the
+ * kind's rule, any two pairs when it names none. The held row, the
+ * signer's account and stake and the verification against its keys are
  * the worker's.
  */
 
@@ -26,6 +30,9 @@ export const attestation = Object.freeze({ type: 'attestation', signerField: 'at
 
 /** The sender taking an assisted transfer back. */
 export const assistedTransferCancel = Object.freeze({ type: 'assistedTransferCancel', signerField: 'accountId' });
+
+/** The break-glass pair taking a break-glass move back, under its own rule: the break-glass pair alone. */
+export const breakGlassCancel = Object.freeze({ type: 'breakGlassCancel', signerField: 'accountId', rule: BREAK_GLASS_PAIR });
 
 /** A guardian's vote on an open fund proposal. */
 export const guardianVote = Object.freeze({ type: 'guardianVote', signerField: 'guardianId' });
@@ -44,14 +51,14 @@ export const escrowVerdict = Object.freeze({ type: 'escrowVerdict', signerField:
 
 /**
  * The check of a follow-up route whose handler allows `kinds`: the shape,
- * then the signatures. Returns a function of the parsed body that answers
- * null or { status, reason }.
+ * then the signatures under the rule of the kind the shape found. Returns
+ * a function of the parsed body that answers null or { status, reason }.
  */
 export function followUpCheck(kinds) {
   return (body) => {
     const shape = checkAttachmentShape(body, kinds);
     if (shape.reason) return refuse(400, shape.reason);
-    const bad = checkSignaturesDecode(body.signatures, ANY_TWO_PAIRS);
+    const bad = checkSignaturesDecode(body.signatures, shape.kind.rule ?? ANY_TWO_PAIRS);
     return bad ? refuse(400, bad) : null;
   };
 }

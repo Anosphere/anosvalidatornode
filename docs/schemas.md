@@ -61,7 +61,7 @@ the doorman VM is the test.
   limiter in Node** (`src/limit/rate-limit.js`), since the allowlist is
   dynamic. fail2ban reads nginx's access log (`deploy/fail2ban/`).
 - **Body caps per route.** Port 3000: 96 KB for `/create-account` and
-  `/transaction-approval`; 64 KB for the eight wallet submission routes,
+  `/transaction-approval`; 64 KB for the nine wallet submission routes,
   `/attachment-approval` and both proof routes; 16 KB for the five signed
   reads; 4 KB for `/ready-announcement`; 256 KB for `/official-list` and
   `/final-declaration`. Port 3200: 32 KB for every route. nginx caps each
@@ -595,3 +595,116 @@ one and the wallet pair, passes both rules.
   type went with the rule.
 - **Checks.** `node --check` passed on both files; no door was started and
   no test script was written.
+
+## 5. The break-glass transfer (2026-11-08)
+
+The doorman's part of anossoftware's break-glass change, from
+`~/Desktop/Z-TestNet/forclaude/break-glass-plan-1.md` (FINAL, 2026-11-08;
+the validator's `docs/schemas.md` section 22): the signing keys of an
+account now die with its passkey, and a new transaction type,
+**`breakGlassTransfer`**, signed by the account's break-glass pair alone
+and attested by two attestors, moves the whole balance to a new account of
+the same type; a new follow-up kind, **`breakGlassCancel`**, signed by the
+same pair, takes a move back. The worker's rule, `BREAK_GLASS_PAIR`: the
+break-glass pair alone, both keys present and verifying against the
+account's `break_glass_pk` and `break_glass_pk_pq`, and no signature from
+the three user pairs beside them, refused with `a breakGlassTransfer is
+signed by the break-glass pair alone`. The door refuses at the door what
+the worker would refuse under that rule, up to the point where a key would
+be needed: the sixth type passes the transfer shape and the new rule
+(`src/checks/transfers.js`, `src/checks/account-signatures.js`), and the
+cancel has its route, `POST /break-glass-cancel`, with its kind under the
+same rule (`src/checks/follow-ups.js`, `src/doors/validator.routes.js`);
+without the change the door would bounce every move as an unknown
+transaction type and every break-glass cancel as a path not in the table,
+before a validator saw them. Step 2 of the plan, built 2026-11-08. Nothing
+else in the door changes: the account-level reads pass by shape whoever
+signed them, so the recovery's read of an old account with the break-glass
+pair needs no line; the fund routes, the validator routes, the keyholder
+door and the relay are as they were, and no file under `deploy/` or
+`fail2ban/` changes. No check ran but `node --check` on the four files
+and one import of them (5.2); the relaunch after the testnet reset is the
+test, every validator and its doorman on the new code before the wallet,
+which is the only thing that sends the new type.
+
+### 5.1 The change
+
+- `src/checks/account-signatures.js`: `BREAK_GLASS_KEYS` (the pair's two
+  fields, `breakGlassKey` P-256 and `breakGlassPostQuantumKey` ML-DSA-87)
+  and `BREAK_GLASS_PAIR`, the worker's constants copied;
+  `checkSignaturesDecode` gains the rule's branch after the walk over the
+  three signing pairs: a user-pair signature present is refused with the
+  worker's reason, then the break-glass pair goes through the same per-key
+  checks as a signing pair, both fields present, each a string, each
+  decoding for its algorithm. The per-key checks moved into `checkPair`,
+  shared by the walk and the branch, as in the worker's copy. The header
+  says two rules.
+- `src/checks/transfers.js`: `BREAK_GLASS_TRANSFER`, the sixth row of
+  `TRANSFER_RULES`, `[BREAK_GLASS_TRANSFER, BREAK_GLASS_PAIR]`; the shape's
+  reason names six types, the worker's string as it is; the comments say
+  six.
+- `src/checks/follow-ups.js`: the kind `breakGlassCancel` (`type`
+  `breakGlassCancel`, signer `accountId`, `rule` `BREAK_GLASS_PAIR`), the
+  eighth; `followUpCheck` checks the signatures under the rule of the kind
+  `checkAttachmentShape` found, `kind.rule ?? ANY_TWO_PAIRS`, so the other
+  seven kinds are untouched. The header says five routes and eight kinds.
+- `src/doors/validator.routes.js`: `POST /break-glass-cancel`, 64 KB,
+  `followUpCheck([breakGlassCancel])`, after `/assisted-transfer-cancel`;
+  the import; the comment on the follow-up routes. No read line.
+- `README.md`: the `/anos-transfer` row (six types, two rules), a
+  `/break-glass-cancel` row, the Layout lines of `account-signatures.js`
+  (two rules) and `follow-ups.js` (five routes, eight kinds), and the
+  design record paragraph names this section.
+- `docs/schemas.md`: 1.1's body caps count nine wallet submission routes;
+  this section.
+
+### 5.2 Notes from the build
+
+Where the plan was silent the simplest thing was chosen and is recorded
+here; nothing in 5.1 was changed.
+
+- **The build was made on main at bdd901c**, the merge of the
+  `updatevalidator19` branch. Every line the plan quotes was where it
+  said. The validator's step 1 was read from its working tree, not yet
+  committed there; the strings the door mirrors are its.
+- **`BREAK_GLASS_KEYS` keeps the worker's `publicKey` field** (`breakGlassPk`,
+  `breakGlassPkPq`), as the door's copy of `SIGNING_PAIRS` does, so the
+  constant is the worker's as it stands; the door reads `name` and
+  `algorithm` only, as its comment says.
+- **`checkPair(signatures, pair)`** is the worker's `checkPair` without the
+  account and the message: the presence, string and decoding checks of
+  one pair, used by the walk over `SIGNING_PAIRS` and by the break-glass
+  branch, so every reason string exists once, as on the worker; the walk
+  skips a pair with neither half present, as before.
+- **The order of the reasons is the worker's**: the three signing pairs
+  are walked first, so under the break-glass rule a user pair with one
+  half present is refused as malformed before the rule's own reason, and
+  under any two pairs a break-glass signature is ignored, as any unknown
+  field is.
+- **The reason for a user-pair signature under the break-glass rule names
+  the `breakGlassTransfer` even on a `breakGlassCancel`**, the worker's
+  string as it is (its 22.4).
+- **The follow-up kinds gained an optional `rule`**; the seven existing
+  kinds have none and fall to `ANY_TWO_PAIRS` through `??`, so the
+  attestation and the sender's any-two-pairs cancel reach a break-glass
+  row through the door as they do on the worker, which checks nothing
+  about the row's type.
+- **Doc spots beyond the plan's list**: none. A search for the counts
+  (five transfer types, seven kinds, four follow-up routes, eight wallet
+  submission routes) and for "any two pairs" across `src/`, the README
+  and this file found only the lines the plan names; the Layout line of
+  `account-signatures.js` already said "the two rules", left over from
+  before section 4, and is true again.
+- **Checks.** `node --check` passed on the four files. Beyond the plan,
+  the four modules were imported once from the shell (`node -e`, nothing
+  written to the repo), to catch a wrong export name that a syntax check
+  cannot: they imported, and the route table had its thirty rows with
+  `/break-glass-cancel` at 64 KB. The same shell line ran
+  `checkSignaturesDecode`, `anosTransferCheck` and the cancel's check on
+  strings of the right lengths and on junk: the break-glass pair alone
+  passed under its rule and was refused under any two pairs; a user pair
+  beside it or instead of it got the worker's reason; a missing half, a
+  non-string and a string that does not decode got the pair's reasons;
+  two user pairs with a stray break-glass pair passed under any two
+  pairs; and an unknown type's reason named the six types. No door was
+  started, no test script or fixture was written.
