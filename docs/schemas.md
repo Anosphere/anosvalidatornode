@@ -708,3 +708,96 @@ here; nothing in 5.1 was changed.
   two user pairs with a stray break-glass pair passed under any two
   pairs; and an unknown type's reason named the six types. No door was
   started, no test script or fixture was written.
+
+## 6. The DAO stake read (2026-11-08)
+
+The doorman's part of the DAO voting ledger, from
+`~/Desktop/Z-TestNet/forclaude/dao-voting-plan-1.md` (FINAL, 2026-11-08;
+the validator's `docs/schemas.md` section 23): plain-text proposals that
+collect support like a petition and then take two weeks of votes for and
+against, one staked anos one vote, kept on the masterpod (its spec,
+section 15). When a proposal is posted, and again when it goes to a vote,
+the masterpod takes one snapshot of every account's DAO stake from a
+validator through one new read, **`POST /list-dao-stakes`**, public: no
+envelope, no signature, no middleware, the first route of the kind, since
+everything it answers is already on the public chain, the masterpod has
+no anos account and no validator key to sign with, and the doorman's rate
+limit covers abuse. The body is `{}`; the worker's one check is that the
+body is an object, else `400 bad request shape`, and nothing in it is
+read; the answer is `200 { asOf, total, stakes: [ { accountId,
+daoVoteStake } ] }`, every `stakes` row with DAO stake, account id
+ascending, or `503 not counted yet` from a joiner. The validator door
+passes only the paths in its table, so the read gets its line, `POST
+/list-dao-stakes` at 4 KB, with a check of its own that refuses at the
+door what the worker would refuse, the object check (`src/checks/reads.js`
+`publicReadCheck`, `src/doors/validator.routes.js`); without the line the
+door would answer 404 to every snapshot before a validator saw it, and the
+masterpod would move on to its next URL. Step 2 of the plan, built
+2026-11-08. Nothing else in the door changes: the seven signed reads, the
+submission, follow-up and validator routes, the keyholder door, the rate
+limit and the relay are as they were, and no file under `deploy/` or
+`fail2ban/` changes; nginx's cap on the port stays at 256k, the route's
+own cap is the 4 KB. No check ran but `node --check` on the two files; the
+pull on each doorman is the test (the plan's section 7), every doorman
+the masterpod's `VALIDATOR_URLS` names on the new code before the
+masterpod, since a doorman without the line answers 404 and the masterpod
+moves on.
+
+### 6.1 The change
+
+- `src/checks/reads.js`: `publicReadCheck(body)`, after `signedReadCheck`:
+  `isObject(body)` (`src/util/is-object.js`), else `refuse(400, 'bad
+  request shape')`, the worker's own check (its `reads.service.js`
+  `listDaoStakes`); the import of `isObject`. The header comment names the
+  seven signed reads and the one public read, each with its check.
+- `src/doors/validator.routes.js`: the import of `publicReadCheck`, and
+  after `/list-disputed-escrows`, under the comment "The public read
+  (docs/schemas.md section 6)", `{ method: 'POST', path:
+  '/list-dao-stakes', maxBytes: 4 * 1024, check: publicReadCheck }`.
+- `README.md`: a `/list-dao-stakes` row after the signed-reads row of the
+  validator door's table; the Layout line of `checks/reads.js`, the seven
+  signed reads and the one public read.
+- `docs/schemas.md`: this section.
+
+### 6.2 Notes from the build
+
+Where the plan was silent the simplest thing was chosen and is recorded
+here; nothing in 6.1 was changed.
+
+- **The build was made on main at 492725a**, the break-glass commit of
+  section 5. Every line the plan quotes was where it said. The validator's
+  step 1 was read from its commit b8c8d32, "The DAO stake read:
+  /list-dao-stakes, public"; the string the door mirrors, `bad request
+  shape`, is its `BAD_SHAPE`.
+- **The reason is written out**, `'bad request shape'`, as the plan gives
+  it. `signed-request.js` exports the same string as `BAD_SHAPE` for the
+  checks that spell it beside `parseSignedRequest` (`create-account.js`,
+  `validator-messages.js`); either spelling sends the same body.
+- **The header comment stays the JSDoc of `signedReadCheck`**, as it was,
+  now opening with the two kinds of read and the check of each; the public
+  read's function has a short JSDoc of its own below it.
+- **The import of `isObject`** sits between the crypto import and the
+  result import, the file's imports being in path order, as in
+  `transfers.js` and `follow-ups.js`.
+- **The route comment ends with a period**, as every comment in the table
+  does; the plan quoted it without one. The line sits under a blank line,
+  a group of its own after the signed reads, as the table's other groups
+  are set apart.
+- **The 4 KB cap is the plan's**: a body of `{}` is two bytes, and the
+  door's other routes with next to nothing in the body are capped at 4 KB
+  too. The header comment of `validator.routes.js`, which lists measured
+  sizes, was not touched.
+- **The README row** says what the door checks (an object, 400 `bad
+  request shape`), that the read is public and since when, and that the
+  stakes are the worker's, in the shape of the table's other rows.
+- **Doc spots beyond the plan's list, found and left for the user's
+  word**, as the validator's 23.4 had two: the README's design record
+  paragraph, which lists sections 1 to 5 of this file and not this one;
+  and 1.1's body caps bullet above, which has said "16 KB for the five
+  signed reads" since build 1, while the table has had seven, and which
+  names neither this route's 4 KB nor the catch-up build's. Nothing the
+  change made false was found: a search for "five signed reads", "seven
+  signed reads", "public" and "unsigned" across `src/`, the README and this
+  file found only the Layout line the plan names and the bullet.
+- **Checks.** `node --check` passed on the two files. No door was started,
+  nothing was imported from the shell and no test script was written.

@@ -10,7 +10,7 @@ import {
   followUpCheck,
   guardianVote,
 } from '../checks/follow-ups.js';
-import { signedReadCheck } from '../checks/reads.js';
+import { publicReadCheck, signedReadCheck } from '../checks/reads.js';
 import { anosTransferCheck, fundProposalCheck, transferToFundCheck } from '../checks/transfers.js';
 import {
   attachmentApprovalCheck,
@@ -74,6 +74,9 @@ export const validatorRoutes = Object.freeze([
   { method: 'POST', path: '/get-locked-transfer', maxBytes: 16 * 1024, check: signedReadCheck },
   { method: 'POST', path: '/list-assisted-transfers', maxBytes: 16 * 1024, check: signedReadCheck },
   { method: 'POST', path: '/list-disputed-escrows', maxBytes: 16 * 1024, check: signedReadCheck },
+
+  // The public read (docs/schemas.md section 6).
+  { method: 'POST', path: '/list-dao-stakes', maxBytes: 4 * 1024, check: publicReadCheck },
 
   // Validator to validator, verified against the registry.
   { method: 'POST', path: '/transaction-approval', maxBytes: 96 * 1024, check: transactionApprovalCheck },
