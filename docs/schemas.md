@@ -545,3 +545,53 @@ Step 2:
   24 receipts measures about 12 KB), 4 KB for the rest. The six are under
   1 KB each; a held rows page of a hundred rows with their attachments is
   an answer, which the relay passes whole.
+
+## 4. The assisted signing rule (2026-11-07)
+
+The doorman's part of anossoftware's assisted signing change, from
+`~/Desktop/Z-TestNet/forclaude/assisted-signing-plan-1.md` (FINAL,
+2026-11-07; the validator's `docs/schemas.md` section 20): an assisted
+transfer signs like every other transfer, **any two pairs**, in place of
+the rule of its own, pair one and the wallet pair, under which nothing
+left an assisted account without the wallet's signature. The door refuses
+at the door what the worker would refuse, under the same rule, so the
+`assistedAnosTransfer` row of `TRANSFER_RULES` (`src/checks/transfers.js`)
+says `ANY_TWO_PAIRS`, and the old rule is deleted from the door's copy of
+the signature check (`src/checks/account-signatures.js`) as it is from the
+worker's; without the change the door would bounce an assisted transfer
+signed by the two user pairs before a validator saw it. Built 2026-11-07.
+Nothing else in the door changes: the follow-up routes, the fund routes,
+the validator routes and the relay are as they were, and no file under
+`deploy/` or `fail2ban/` changes. No check ran but `node --check` on the
+two files; the relaunch is the test, and what the wallet sends today, pair
+one and the wallet pair, passes both rules.
+
+### 4.1 The change
+
+- `src/checks/transfers.js`: the `ASSISTED_ANOS_TRANSFER` row of
+  `TRANSFER_RULES` is `ANY_TWO_PAIRS`; the import drops
+  `PAIR_ONE_AND_WALLET`; the comment above the map says any two pairs for
+  every one of the five since 2026-11-07. The map stays: `isTransferType`
+  and `anosTransferCheck` read it.
+- `src/checks/account-signatures.js`: `PAIR_ONE_AND_WALLET`, its list of
+  pairs and its branch in `checkSignaturesDecode` are deleted, with the
+  same comment changes as the worker's copy; the `rule` parameter,
+  `ANY_TWO_PAIRS`, `MIN_SIGNING_PAIRS` and the throw for an unknown rule
+  stay. The refusal for too few pairs is the worker's: `signatures must
+  come from at least 2 of the key pairs key1, key2 and walletKey`.
+- `README.md`: the `/anos-transfer` row of the check table, and the
+  design record paragraph names this section.
+
+### 4.2 Notes from the build
+
+- **Main had moved on.** The plan names main at 02358f7; the build was
+  made on b6f52cc, the merge of the `updatevalidator18` branch. Every line
+  the plan quotes was where it said.
+- **Nothing else in the door named the old rule**: a search for
+  `PAIR_ONE_AND_WALLET`, `pairOneAndWallet` and "pair one and the wallet"
+  found only the two files and the README row the plan lists.
+- **The README row** now ends "at least two of the three pairs (any two
+  pairs, every type since 2026-11-07)"; the words that named a rule per
+  type went with the rule.
+- **Checks.** `node --check` passed on both files; no door was started and
+  no test script was written.

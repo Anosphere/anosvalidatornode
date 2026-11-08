@@ -105,7 +105,7 @@ The validator door (port 3000; KB is 1024 bytes):
 | Path | Cap | Check |
 | --- | --- | --- |
 | `/create-account` | 96 KB | the shape; each of the eight public keys decodes for its algorithm, each signature decodes and verifies against its key over the canonical payload. The id hashes, uniqueness and the binding are the worker's |
-| `/anos-transfer` | 64 KB | the transfer shape; every signature present is a string that decodes, both halves of each pair, under the type's rule: pair one and the wallet pair for `assistedAnosTransfer`, any two pairs for the other four |
+| `/anos-transfer` | 64 KB | the transfer shape; every signature present is a string that decodes, both halves of each pair, at least two of the three pairs (any two pairs, every type since 2026-11-07) |
 | `/transfer-to-fund` | 64 KB | the transferToFund shape; signatures as above, any two pairs |
 | `/fund-proposal` | 64 KB | the fundProposal shape, payouts included; signatures, any two pairs |
 | `/attestation` | 64 KB | the follow-up shape with `payload.type` `attestation`, signer `attestorId`; signatures, any two pairs |
@@ -404,4 +404,6 @@ docs/
 decisions as they apply to the code, the files and variables, and the
 notes from the build; section 2, the bootstrap scripts; section 3,
 "Catch-up, ignore votes and joining (2026-11-07)", the route entries of
-the validator's catch-up build.
+the validator's catch-up build; section 4, "The assisted signing rule
+(2026-11-07)", the one signing rule, any two pairs, for every transfer
+type.
