@@ -107,7 +107,7 @@ the doorman VM is the test.
   `npm run setup -- --worker-ip <ip>` (`scripts/setup.js`: an IPv4 address
   in a private range, exclusive create, refuses to run twice, prints the
   next commands). Everything else is in `network/testnet.env`.
-- **Two listeners, one pipeline.** The keyholder table is the nine POST
+- **Two listeners, one pipeline.** The keyholder table is the ten POST
   routes by level plus nothing; `OPTIONS` on a table path is forwarded
   with no checks; port 80 serves only the ACME path; anything not in a
   table is 404 from the door; a worker that does not answer is 502
@@ -928,3 +928,73 @@ here; nothing in 7.1 was changed.
 - **Checks.** `node --check` passed on the two files, `validator.routes.js`
   and `reads.js`. No door was started, nothing was imported from the shell
   and no test script was written.
+
+## 8. The owner lookup (2026-11-08)
+
+The doorman's part of the recovery lookup plan, from
+`~/Desktop/Z-TestNet/forclaude/recovery-lookup-plan-1.md` (FINAL,
+2026-11-08; the keyholder's `docs/schemas.md` section 15): a locked-out
+person recovering an anoPod had to type the username of the pod they
+lost, and people forget it. The wallet now computes the lookup id from
+the nine birth record fields, as it already did, and asks every keyholder
+at once which pod deposited for it, through a new unsigned keyholder
+route, **`POST /get-owner`**, body `{ lookupId }`, answering `200 {
+lookupId, anopodId, keyholderId }`, else `400 bad request shape`, `400
+invalid lookupId` or `404 unknown lookup id`; the first `200` wins, and
+the masterpod then names the account from the id. The route is level
+none, like `/get-keyholder-public-key`: a locked-out person has nothing
+to sign with. The keyholder door passes only the paths in its table, so
+the route needs one line there before a wallet can reach it; without the
+line the door answers `404 Not Found`, which the wallet counts as a
+keyholder that did not answer, and with every doorman old the person
+reads "The keyholders could not be reached". Step 2 of the plan, built
+2026-11-08. Nothing else in the door changes: the nine routes the
+keyholder table had, the validator door, the rate limit and the relay are
+as they were; no new npm package, no env variable, and no file under
+`deploy/` or `fail2ban/` changes; nginx's cap on the port stays at 32k,
+the route's own cap the 32 KB of its siblings. No check ran but `node
+--check` on the one file; the pull on each doorman is the test (the
+plan's section 6): the keyholder and the doorman at each validator's
+visit, the masterpod, then the wallet.
+
+### 8.1 The change
+
+- `src/doors/keyholder.routes.js`: after the `/get-keyholder-public-key`
+  line, under the comment "Level none: no envelope; the worker checks the
+  body's shape itself", `{ method: 'POST', path: '/get-owner', maxBytes:
+  32 * 1024, check: null }`. The header comment says ten POST routes. No
+  new import.
+- `README.md`: the keyholder door table gains a row after
+  `/get-keyholder-public-key`, `/get-owner`, none: the worker checks the
+  shape; the Layout line of `checks/keyholder.js` says ten keyholder
+  routes by level.
+- `docs/schemas.md`: this section; 1.1's "Two listeners, one pipeline"
+  line says ten POST routes.
+
+### 8.2 Notes from the build
+
+Where the plan was silent the simplest thing was chosen and is recorded
+here; nothing in 8.1 was changed.
+
+- **The build was made on main at 81e6684**, the tip after the fund
+  proposal reads (section 7). The `/get-keyholder-public-key` line was
+  where the plan said; the new line sits under its own comment, as the
+  plan quotes it, so the two none-level lines each say why the door has
+  no check: the first because the worker does not read the body, the
+  second because the worker checks the shape itself (`400 bad request
+  shape`, `400 invalid lookupId`, in the keyholder's
+  `src/shares/owner.service.js`).
+- **`check: null` is the plan's.** The door could refuse a body without a
+  `lookupId` string itself, as the validator door's `publicReadCheck`
+  refuses a non-object, but the plan gave the shape to the worker and
+  asked for no check at the door, so the door caps the size and relays.
+- **The 32 KB cap is the siblings'.** The body is `{ lookupId }` with 64
+  hex characters, under 100 bytes; the cap matches every other line of
+  the table and nginx's 32k on the port. The header comment's measured
+  size (a receive-share under 21 KB) was not touched, as in sections 6
+  and 7.
+- **The README row** says what the door checks (nothing but the cap) and
+  points at the keyholder spec with the date, in the shape of the
+  `/get-keyholder-public-key` row above it.
+- **`node --check`** passed on `src/doors/keyholder.routes.js`. Nothing
+  booted; no doorman was touched.

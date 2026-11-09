@@ -2,7 +2,7 @@ import { envelopeCheck } from '../checks/keyholder.js';
 
 /**
  * The route table of the keyholder door: port 3200, forwarded to
- * WORKER_IP:3200. The keyholder's nine POST routes, each with the envelope
+ * WORKER_IP:3200. The keyholder's ten POST routes, each with the envelope
  * shape of its level (src/checks/keyholder.js) and a 32 KB cap (nginx caps
  * the port at 32k too; a receive-share measures under 21 KB), plus nothing
  * else: GET /health is the door's own. Shape and size only; the keys of
@@ -21,6 +21,8 @@ const yubikey = envelopeCheck('yubikey', { mldsa: false });
 export const keyholderRoutes = Object.freeze([
   // Level none: the worker does not read the body, so no check beyond the cap.
   { method: 'POST', path: '/get-keyholder-public-key', maxBytes: 32 * 1024, check: null },
+  // Level none: no envelope; the worker checks the body's shape itself (keyholder spec section 15).
+  { method: 'POST', path: '/get-owner', maxBytes: 32 * 1024, check: null },
 
   { method: 'POST', path: '/receive-share', maxBytes: 32 * 1024, check: pod },
 
