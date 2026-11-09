@@ -2,6 +2,7 @@ import { createAccountCheck } from '../checks/create-account.js';
 import {
   assistedTransferCancel,
   attestation,
+  breakGlassCancel,
   escrowCancel,
   escrowDispute,
   escrowSuccess,
@@ -9,7 +10,7 @@ import {
   followUpCheck,
   guardianVote,
 } from '../checks/follow-ups.js';
-import { signedReadCheck } from '../checks/reads.js';
+import { publicReadCheck, signedReadCheck } from '../checks/reads.js';
 import { anosTransferCheck, fundProposalCheck, transferToFundCheck } from '../checks/transfers.js';
 import {
   attachmentApprovalCheck,
@@ -52,9 +53,11 @@ export const validatorRoutes = Object.freeze([
   { method: 'POST', path: '/transfer-to-fund', maxBytes: 64 * 1024, check: transferToFundCheck },
   { method: 'POST', path: '/fund-proposal', maxBytes: 64 * 1024, check: fundProposalCheck },
 
-  // The follow-ups, each route with the kinds its worker handler allows.
+  // The five follow-up routes, each with the kinds its worker handler
+  // allows; /break-glass-cancel since 2026-11-08 (docs/schemas.md section 5).
   { method: 'POST', path: '/attestation', maxBytes: 64 * 1024, check: followUpCheck([attestation]) },
   { method: 'POST', path: '/assisted-transfer-cancel', maxBytes: 64 * 1024, check: followUpCheck([assistedTransferCancel]) },
+  { method: 'POST', path: '/break-glass-cancel', maxBytes: 64 * 1024, check: followUpCheck([breakGlassCancel]) },
   { method: 'POST', path: '/guardian-vote', maxBytes: 64 * 1024, check: followUpCheck([guardianVote]) },
   {
     method: 'POST',
@@ -71,6 +74,11 @@ export const validatorRoutes = Object.freeze([
   { method: 'POST', path: '/get-locked-transfer', maxBytes: 16 * 1024, check: signedReadCheck },
   { method: 'POST', path: '/list-assisted-transfers', maxBytes: 16 * 1024, check: signedReadCheck },
   { method: 'POST', path: '/list-disputed-escrows', maxBytes: 16 * 1024, check: signedReadCheck },
+
+  // The public reads (docs/schemas.md sections 6 and 7).
+  { method: 'POST', path: '/list-dao-stakes', maxBytes: 4 * 1024, check: publicReadCheck },
+  { method: 'POST', path: '/list-fund-proposals', maxBytes: 4 * 1024, check: publicReadCheck },
+  { method: 'POST', path: '/get-fund-proposal', maxBytes: 4 * 1024, check: publicReadCheck },
 
   // Validator to validator, verified against the registry.
   { method: 'POST', path: '/transaction-approval', maxBytes: 96 * 1024, check: transactionApprovalCheck },

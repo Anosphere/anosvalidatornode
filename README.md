@@ -105,14 +105,18 @@ The validator door (port 3000; KB is 1024 bytes):
 | Path | Cap | Check |
 | --- | --- | --- |
 | `/create-account` | 96 KB | the shape; each of the eight public keys decodes for its algorithm, each signature decodes and verifies against its key over the canonical payload. The id hashes, uniqueness and the binding are the worker's |
-| `/anos-transfer` | 64 KB | the transfer shape; every signature present is a string that decodes, both halves of each pair, at least two of the three pairs (any two pairs, every type since 2026-11-07) |
+| `/anos-transfer` | 64 KB | the transfer shape, `transactionType` one of six; every signature present is a string that decodes, both halves of each pair; then the type's rule, one of two: at least two of the three pairs (any two pairs) for five of the types, since 2026-11-07; for a `breakGlassTransfer` the break-glass pair alone, both halves, with no user-pair signature beside it, since 2026-11-08 |
 | `/transfer-to-fund` | 64 KB | the transferToFund shape; signatures as above, any two pairs |
 | `/fund-proposal` | 64 KB | the fundProposal shape, payouts included; signatures, any two pairs |
 | `/attestation` | 64 KB | the follow-up shape with `payload.type` `attestation`, signer `attestorId`; signatures, any two pairs |
 | `/assisted-transfer-cancel` | 64 KB | follow-up, kind `assistedTransferCancel`, signer `accountId` |
+| `/break-glass-cancel` | 64 KB | follow-up, kind `breakGlassCancel`, signer `accountId`; signatures, the break-glass pair alone |
 | `/guardian-vote` | 64 KB | follow-up, kind `guardianVote`, signer `guardianId` |
 | `/escrow-signature` | 64 KB | follow-up, kinds `escrowSuccess`, `escrowCancel`, `escrowDispute` (signer `accountId`) and `escrowVerdict` (signer `arbitratorId`) |
 | `/get-account`, `/list-transactions`, `/list-escrows`, `/get-assisted-transfer`, `/get-locked-transfer`, `/list-assisted-transfers`, `/list-disputed-escrows` | 16 KB | the signed envelope with `accountId`, both signatures (400 `bad request shape`); `ecdsa` decodes as P-256 and `mldsa` as ML-DSA-87 (401 `bad signature`). `path`, `timestamp`, the account and the nonce are the worker's |
+| `/list-dao-stakes` | 4 KB | the body is an object (400 `bad request shape`), the worker's own check; the first public read, no envelope and no signature, since 2026-11-08 (`docs/schemas.md` section 6). Nothing in the body is read; the stakes are the worker's |
+| `/list-fund-proposals` | 4 KB | the body is an object (400 `bad request shape`), the worker's own check; public, no envelope and no signature, since 2026-11-08 (`docs/schemas.md` section 7). `status`, `limit`, `offset`, `from` and `to` are the worker's (400 `invalid status`, `invalid limit`, `invalid offset`, `invalid from`, `invalid to`) |
+| `/get-fund-proposal` | 4 KB | the body is an object (400 `bad request shape`), the worker's own check; public, as above (`docs/schemas.md` section 7). `transactionId` is the worker's (400 `invalid transactionId`, 404 `unknown proposal`) |
 | `/transaction-approval` | 96 KB | the worker's shape; `originatingValidator` is an active registry row; `signature.key` decodes as P-256 and verifies against that row's key over the canonical payload |
 | `/proof-of-acceptance` | 64 KB | as above, and every receipt has the approved-receipt shape and a decoding `signature.key` (receipts are not verified at the door) |
 | `/attachment-approval` | 64 KB | as `/transaction-approval`, with the attachment approval's shape |
@@ -368,11 +372,11 @@ src/
   doors/keyholder.routes.js      the route table of port 3200
   checks/signed-request.js       parseSignedRequest (the shape half of anossoftware's), the decode helpers
   checks/account-keys.js         the eight account keys, in order, with algorithms (copy)
-  checks/account-signatures.js   the three pairs, the two rules, decode-only
+  checks/account-signatures.js   the three signing pairs and the break-glass pair, the two rules, decode-only
   checks/create-account.js       shape, eight keys decode, eight signatures decode and verify
   checks/transfers.js            /anos-transfer, /transfer-to-fund, /fund-proposal
-  checks/follow-ups.js           the four follow-up routes and the seven kinds
-  checks/reads.js                the five signed reads
+  checks/follow-ups.js           the five follow-up routes and the eight kinds
+  checks/reads.js                the seven signed reads and the three public reads
   checks/validator-messages.js   the fourteen validator routes (seven, plus the catch-up build's seven), verified against the registry
   checks/keyholder.js            the nine keyholder routes by level
 scripts/
@@ -406,4 +410,10 @@ notes from the build; section 2, the bootstrap scripts; section 3,
 "Catch-up, ignore votes and joining (2026-11-07)", the route entries of
 the validator's catch-up build; section 4, "The assisted signing rule
 (2026-11-07)", the one signing rule, any two pairs, for every transfer
-type.
+type; section 5, "The break-glass transfer (2026-11-08)", the second rule,
+the break-glass pair alone, for the sixth transfer type and its cancel;
+section 6, "The DAO stake read (2026-11-08)", the first public read,
+`/list-dao-stakes`, let through the validator door; section 7, "The fund
+proposal reads (2026-11-08)", two more public reads, `/list-fund-proposals`
+and `/get-fund-proposal`, let through the same way for the wallet's
+Guardians page.
