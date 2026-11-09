@@ -137,6 +137,7 @@ size only, since the keys of every level live elsewhere:
 | Path | Check |
 | --- | --- |
 | `/get-keyholder-public-key` | none: the worker does not read the body |
+| `/get-owner` | none: the worker checks the shape (keyholder spec section 15, 2026-11-08) |
 | `/receive-share` | the envelope with signer `anopodId`, both signatures present and decoding |
 | `/get-security-bucket-one-key`, `/get-security-bucket-two-key`, `/get-public-ledger-id` | the envelope with signer `accountId`, both signatures |
 | `/get-break-glass-key`, `/get-backup-code`, `/decrypt-break-glass-key`, `/decrypt-backup-code` | the envelope with signer `yubikey`, `ecdsa` only |
@@ -378,7 +379,7 @@ src/
   checks/follow-ups.js           the five follow-up routes and the eight kinds
   checks/reads.js                the seven signed reads and the three public reads
   checks/validator-messages.js   the fourteen validator routes (seven, plus the catch-up build's seven), verified against the registry
-  checks/keyholder.js            the nine keyholder routes by level
+  checks/keyholder.js            the ten keyholder routes by level
 scripts/
   setup.js                       once, on the VM: writes .env with WORKER_IP
   install-system-files.sh        puts deploy/ in place, reloads, restarts (as root)
