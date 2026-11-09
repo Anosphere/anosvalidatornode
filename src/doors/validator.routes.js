@@ -75,8 +75,10 @@ export const validatorRoutes = Object.freeze([
   { method: 'POST', path: '/list-assisted-transfers', maxBytes: 16 * 1024, check: signedReadCheck },
   { method: 'POST', path: '/list-disputed-escrows', maxBytes: 16 * 1024, check: signedReadCheck },
 
-  // The public read (docs/schemas.md section 6).
+  // The public reads (docs/schemas.md sections 6 and 7).
   { method: 'POST', path: '/list-dao-stakes', maxBytes: 4 * 1024, check: publicReadCheck },
+  { method: 'POST', path: '/list-fund-proposals', maxBytes: 4 * 1024, check: publicReadCheck },
+  { method: 'POST', path: '/get-fund-proposal', maxBytes: 4 * 1024, check: publicReadCheck },
 
   // Validator to validator, verified against the registry.
   { method: 'POST', path: '/transaction-approval', maxBytes: 96 * 1024, check: transactionApprovalCheck },

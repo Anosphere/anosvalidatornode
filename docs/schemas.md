@@ -63,8 +63,9 @@ the doorman VM is the test.
 - **Body caps per route.** Port 3000: 96 KB for `/create-account` and
   `/transaction-approval`; 64 KB for the nine wallet submission routes,
   `/attachment-approval` and both proof routes; 16 KB for the seven signed
-  reads; 4 KB for `/ready-announcement` and the public read
-  `/list-dao-stakes` (section 6); 256 KB for `/official-list` and
+  reads; 4 KB for `/ready-announcement` and the three public reads,
+  `/list-dao-stakes` (section 6), `/list-fund-proposals` and
+  `/get-fund-proposal` (section 7); 256 KB for `/official-list` and
   `/final-declaration`. Port 3200: 32 KB for every route. nginx caps each
   port at its largest route (256k, 32k); the door caps per route with
   `express.raw`, answering 413 `request body too large` either way.
@@ -807,3 +808,123 @@ here; nothing in 6.1 was changed.
   Layout line the plan names and the bullet.
 - **Checks.** `node --check` passed on the two files. No door was started,
   nothing was imported from the shell and no test script was written.
+
+## 7. The fund proposal reads (2026-11-08)
+
+The doorman's part of the Guardians plan, from
+`~/Desktop/Z-TestNet/forclaude/wallet-guardians-plan-1.md` (FINAL,
+2026-11-08; the validator's `docs/schemas.md` section 25, which the plan
+first called 24, that number having been taken by the appointed stakes):
+the wallet gets a Guardians page under its DAO page, `/dao/guardians`,
+where everyone signed in sees the fund's proposals, their payouts, the
+votes and the decided list, and an account with at least one guardian
+vote proposes and votes. The validators keep the guts they had (the
+`fundProposal` transaction, the `guardianVote` follow-up, the tally in the
+leader round, the archives a decided proposal becomes) and gain the
+reading side: two public reads built like `/list-dao-stakes` (section 6),
+no envelope, no signature, no middleware, since everything they answer is
+the fund's business, a written proposal's payouts being on the public
+chain and the votes the guardians' public act on the fund's money.
+**`POST /list-fund-proposals`**, body `{ status: 'open' | 'decided',
+limit?, offset?, from?, to? }`, answers `200 { settings, proposals }`:
+with `open` the one row the fund can hold at a time, with `decided` the
+archived proposals newest first, 20 at a time, after `offset` rows and
+within `from` and `to` when given. **`POST /get-fund-proposal`**, body
+`{ transactionId: hex }`, answers `200 { settings, proposal }`, the item
+plus its payouts and the proposer's weight, else `404 unknown proposal`.
+`settings` carries the validator's four guardian numbers, so the wallet
+reads the rule from the validator. The worker's first check on both is
+that the body is an object, else `400 bad request shape`; the fields are
+its own too (`400 invalid status`, `invalid limit`, `invalid offset`,
+`invalid from`, `invalid to`, `invalid transactionId`), and a joiner
+answers `503 not counted yet` as to every POST. The validator door passes
+only the paths in its table, so each read gets its line, `POST
+/list-fund-proposals` and `POST /get-fund-proposal` at 4 KB, with the
+object check of section 6 at the door (`src/checks/reads.js`
+`publicReadCheck`, `src/doors/validator.routes.js`) and the fields left
+to the worker; without the lines the door would answer 404 and the wallet
+would show the refusal in red on the Guardians page and never a proposal.
+Step 2 of the plan, built 2026-11-08. Nothing else in the door changes:
+the seven signed reads, the DAO stake read, the submission, follow-up and
+validator routes, the keyholder door, the rate limit and the relay are as
+they were; no new npm package, no env variable, and no file under
+`deploy/` or `fail2ban/` changes; nginx's cap on the port stays at 256k,
+each route's own cap is the 4 KB. No check ran but `node --check` on the
+two files; the pull on each doorman is the test (the plan's section 6),
+the wallet's `defaultValidator` and its doorman first and the wallet
+after them, since a wallet against a doorman without the lines shows the
+read's refusal and everything else works.
+
+### 7.1 The change
+
+- `src/doors/validator.routes.js`: after `/list-dao-stakes`, under the
+  comment "The public read (docs/schemas.md section 6)", `{ method:
+  'POST', path: '/list-fund-proposals', maxBytes: 4 * 1024, check:
+  publicReadCheck }` and the same line for `/get-fund-proposal`, in that
+  order. No new import: `publicReadCheck` came in with section 6. On the
+  user's word (7.2), the comment now reads "The public reads
+  (docs/schemas.md sections 6 and 7)".
+- `src/checks/reads.js`, on the user's word (7.2), comments only: the
+  header counts the three public reads and names the two new paths, and
+  the JSDoc of `publicReadCheck` names the worker's three functions and
+  says whose the fields are. No line of code changes.
+- `README.md`: two rows after the `/list-dao-stakes` row of the validator
+  door's table; the Layout line of `checks/reads.js`, the seven signed
+  reads and the three public reads; and, on the user's word (7.2), the
+  `/list-dao-stakes` row says the first public read and the design record
+  paragraph names this section.
+- `docs/schemas.md`: this section; and, on the user's word (7.2), 1.1's
+  body caps bullet names the three public reads at 4 KB.
+
+### 7.2 Notes from the build
+
+Where the plan was silent the simplest thing was chosen and is recorded
+here; nothing in 7.1 was changed.
+
+- **The build was made on main at 5f84895**, the commit that named the DAO
+  stake read in the design record and the body caps (6.2), on top of
+  637ccd6, the stake read's line. Every line the plan quotes was where it
+  said. The validator's step 1 was read from its commit aaacc2b, "The fund
+  proposal reads: /list-fund-proposals and /get-fund-proposal, public;
+  /get-account answers the stakes"; the string the door mirrors, `bad
+  request shape`, is its `BAD_SHAPE`, the first check of both
+  `listFundProposals` and `getFundProposal` in its `reads.service.js`.
+- **`publicReadCheck` is used as it is**, with no check of its own per
+  route. The body being an object is what the worker refuses first on
+  both reads, and the fields are the worker's by the plan, as `path`,
+  `timestamp` and the nonce of a signed read are: the door would have to
+  copy the status words, the limit's cap and the hex rule to refuse them,
+  and the plan did not ask for the copy.
+- **The 4 KB cap is the plan's.** The largest body either read takes is
+  small: a decided list with every field filled (`status`, `limit` 200,
+  `offset`, `from` and `to` as full ISO 8601 stamps) is 109 bytes, and
+  `{ transactionId }` with its 64 hex characters is 84. The header comment
+  of `validator.routes.js`, which lists measured sizes, was not touched,
+  as in section 6.
+- **The two README rows** say what the door checks (an object, 400 `bad
+  request shape`), that the read is public and since when, and which
+  fields are the worker's with the worker's word for a bad one, in the
+  shape of the `/list-dao-stakes` row; the second row says "as above"
+  for what the first spells out.
+- **Five doc spots beyond the plan's list were fixed on the user's word**,
+  as section 6 had two, this time in the build chat before the step was
+  committed, comments and prose only, no line of code: the route comment
+  the two lines sit under, "The public read (docs/schemas.md section 6)",
+  over three lines and naming one section, now "The public reads
+  (docs/schemas.md sections 6 and 7)"; the header of `src/checks/reads.js`,
+  "the one public read, /list-dao-stakes", now the three with the two new
+  paths, and the JSDoc of `publicReadCheck`, which named `listDaoStakes`
+  alone and said nothing in the body is read on the worker (true of the
+  stake read, not of these two, whose fields the worker reads), now naming
+  the three worker functions and whose the fields are; the README's
+  `/list-dao-stakes` row, "the one public read", now "the first public
+  read"; the README's design record paragraph, which listed sections 1 to
+  6 of this file, now naming this one; and 1.1's body caps bullet, which
+  named `/list-dao-stakes` alone as the public read at 4 KB, now naming
+  the three. Nothing else the change made false was found: a search for
+  "signed read", "public read", "unsigned" and "one public" across
+  `src/`, the README and this file found only those and the Layout line
+  the plan names.
+- **Checks.** `node --check` passed on the two files, `validator.routes.js`
+  and `reads.js`. No door was started, nothing was imported from the shell
+  and no test script was written.
