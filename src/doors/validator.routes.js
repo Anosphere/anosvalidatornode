@@ -9,6 +9,7 @@ import {
   escrowVerdict,
   followUpCheck,
   guardianVote,
+  lockedTransferCancel,
 } from '../checks/follow-ups.js';
 import { publicReadCheck, signedReadCheck } from '../checks/reads.js';
 import { anosTransferCheck, fundProposalCheck, transferToFundCheck } from '../checks/transfers.js';
@@ -53,10 +54,11 @@ export const validatorRoutes = Object.freeze([
   { method: 'POST', path: '/transfer-to-fund', maxBytes: 64 * 1024, check: transferToFundCheck },
   { method: 'POST', path: '/fund-proposal', maxBytes: 64 * 1024, check: fundProposalCheck },
 
-  // The five follow-up routes, each with the kinds its worker handler
+  // The six follow-up routes, each with the kinds its worker handler
   // allows; /break-glass-cancel since 2026-11-08 (docs/schemas.md section 5).
   { method: 'POST', path: '/attestation', maxBytes: 64 * 1024, check: followUpCheck([attestation]) },
   { method: 'POST', path: '/assisted-transfer-cancel', maxBytes: 64 * 1024, check: followUpCheck([assistedTransferCancel]) },
+  { method: 'POST', path: '/locked-transfer-cancel', maxBytes: 64 * 1024, check: followUpCheck([lockedTransferCancel]) },
   { method: 'POST', path: '/break-glass-cancel', maxBytes: 64 * 1024, check: followUpCheck([breakGlassCancel]) },
   { method: 'POST', path: '/guardian-vote', maxBytes: 64 * 1024, check: followUpCheck([guardianVote]) },
   {
