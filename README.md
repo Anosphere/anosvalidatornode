@@ -207,8 +207,9 @@ timer `doorman-quota-reset.timer` resets the count at 00:05 on the 1st of
 each month. SSH through IAP and the worker path survive a trip; renewals,
 updates and the validator itself do not, and the health sweep then shows
 the validator unreachable. About $12 a month at the premium tier's
-$0.12/GB. Each operator also sets a Cloud Billing budget with email alerts,
-for visibility (operator guide, Network, point 7).
+$0.12/GB. Each operator's project also has a Cloud Billing budget with email
+alerts, for visibility; the Cloud Shell script makes it (operator guide,
+step 14).
 
 ```bash
 sudo nft list quota inet doorman egress-month
@@ -384,7 +385,7 @@ src/
 scripts/
   setup.js                       once, on the VM: writes .env with WORKER_IP
   install-system-files.sh        puts deploy/ in place, reloads, restarts (as root)
-  bootstrap-project.sh           Cloud Shell: the project side, operator guide steps 2 and 5
+  bootstrap-project.sh           Cloud Shell: the project side, operator guide steps 2, 5, 12, 13 and 14
   bootstrap-doorman.sh           the doorman VM: step 3, then every update (as root)
 network/
   testnet.env                    every value that is the same on every doorman, committed
