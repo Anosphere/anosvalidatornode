@@ -385,7 +385,7 @@ src/
 scripts/
   setup.js                       once, on the VM: writes .env with WORKER_IP
   install-system-files.sh        puts deploy/ in place, reloads, restarts (as root)
-  bootstrap-project.sh           Cloud Shell: the project side, operator guide steps 2, 5, 12, 13 and 14
+  bootstrap-project.sh           Cloud Shell: the project side, operator guide steps 2, 5, 12, 13, 14 and 15
   bootstrap-doorman.sh           the doorman VM: step 3, then every update (as root)
 network/
   testnet.env                    every value that is the same on every doorman, committed

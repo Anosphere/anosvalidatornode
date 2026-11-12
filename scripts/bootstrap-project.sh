@@ -2,9 +2,10 @@
 # Prepares an operator's Google Cloud project for the two VMs of a
 # validator: the operator guide's step 2 (the network and the worker's
 # disk), step 5 (Cloud KMS), step 12 (the worker's backups), step 13 (the
-# bucket for the key files) and step 14 (the budget), point by point, one
-# line printed per point. Runs in Cloud Shell, as the operator, with the
-# project set first; every value is a flag and nothing is asked:
+# bucket for the key files), step 14 (the budget) and step 15 (the bucket
+# for the copies of the keyholder's shares), point by point, one line
+# printed per point. Runs in Cloud Shell, as the operator, with the project
+# set first; every value is a flag and nothing is asked:
 #
 #   gcloud config set project <project id> && curl -fsSLO https://raw.githubusercontent.com/Anosphere/anosvalidatornode/main/scripts/bootstrap-project.sh && sh bootstrap-project.sh --zone <zone> --doorman-ip <doorman static ip> --id <N>
 #
@@ -599,6 +600,51 @@ if make_budget; then
 else
   say '14.1 budget: not made here; make it on the Console page (Billing, Budgets & alerts, Create budget: 100 USD a month for this project, alerts at 90 and 100 percent)'
 fi
+
+# 15.1 The bucket for the copies of the keyholder's shares: in the worker's
+#      region, closed to the public, every file kept 365 days. The keyholder
+#      writes one small file there for every share it saves, so a worker
+#      restored from its vault lacks none of the shares that came after the
+#      vault's last copy. No old versions are kept and no filter is set.
+at 15.1 "bucket $PROJECT-share-copies"
+COPIES_BUCKET="gs://$PROJECT-share-copies"
+if gcloud storage buckets describe "$COPIES_BUCKET"; then
+  say "15.1 bucket $PROJECT-share-copies: already"
+else
+  gcloud storage buckets create "$COPIES_BUCKET" --location "$REGION" --uniform-bucket-level-access --public-access-prevention --retention-period 365d
+  say "15.1 bucket $PROJECT-share-copies: created in $REGION, every file kept 365 days"
+fi
+
+# 15.2 The 365 days locked, as at 13.2: it cannot be undone, and the yes is
+#      piped in.
+at 15.2 'bucket lock'
+# copies_bucket_locked: the bucket's description says its retention is locked.
+copies_bucket_locked() {
+  gcloud storage buckets describe "$COPIES_BUCKET" --format=json | grep -q '"isLocked": true'
+}
+if copies_bucket_locked; then
+  say '15.2 bucket lock: already locked'
+else
+  printf 'y\n' | gcloud storage buckets update "$COPIES_BUCKET" --lock-retention-period
+  say '15.2 bucket lock: locked'
+fi
+
+# 15.3 The worker's service account may add files to the bucket, and
+#      nothing more: it cannot read, delete or replace one. Set on every
+#      run: the binding is idempotent.
+at 15.3 'worker may add files'
+gcloud storage buckets add-iam-policy-binding "$COPIES_BUCKET" --member "serviceAccount:$SA" --role roles/storage.objectCreator --quiet
+say "15.3 worker may add files: roles/storage.objectCreator for $SA"
+
+# 15.4 Look again: the lock, read back as at 13.3, and the bucket's
+#      permissions, read back one line per role and member, which must show
+#      the worker's account under the role of 15.3.
+at 15.4 'look again'
+copies_bucket_locked || fail "the 365 days of $COPIES_BUCKET are not locked: paste gcloud storage buckets update $COPIES_BUCKET --lock-retention-period and answer y"
+COPIES_POLICY=$(gcloud storage buckets get-iam-policy "$COPIES_BUCKET" --flatten='bindings[].members' --format='value(bindings.role,bindings.members)' | tr '\t' ' ')
+echo "$COPIES_POLICY"
+has_line "$COPIES_POLICY" "roles/storage.objectCreator serviceAccount:$SA" || fail "the permissions of $COPIES_BUCKET do not show roles/storage.objectCreator for $SA: paste gcloud storage buckets add-iam-policy-binding $COPIES_BUCKET --member serviceAccount:$SA --role roles/storage.objectCreator"
+say "15.4 look again: $PROJECT-share-copies is locked, the worker may add files"
 
 # What leaves this script, and the next lines.
 say 'Values for the next lines:'
