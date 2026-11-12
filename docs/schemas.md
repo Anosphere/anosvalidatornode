@@ -61,9 +61,9 @@ the doorman VM is the test.
   limiter in Node** (`src/limit/rate-limit.js`), since the allowlist is
   dynamic. fail2ban reads nginx's access log (`deploy/fail2ban/`).
 - **Body caps per route.** Port 3000: 96 KB for `/create-account` and
-  `/transaction-approval`; 64 KB for the nine wallet submission routes,
-  `/attachment-approval` and both proof routes; 16 KB for the seven signed
-  reads; 4 KB for `/ready-announcement` and the three public reads,
+  `/transaction-approval`; 64 KB for the other nine wallet submission
+  routes, `/attachment-approval` and both proof routes; 16 KB for the seven
+  signed reads; 4 KB for `/ready-announcement` and the three public reads,
   `/list-dao-stakes` (section 6), `/list-fund-proposals` and
   `/get-fund-proposal` (section 7); 256 KB for `/official-list` and
   `/final-declaration`. Port 3200: 32 KB for every route. nginx caps each
@@ -998,3 +998,155 @@ here; nothing in 8.1 was changed.
   `/get-keyholder-public-key` row above it.
 - **`node --check`** passed on `src/doors/keyholder.routes.js`. Nothing
   booted; no doorman was touched.
+
+## 9. The locked transfer cancel (2026-11-11)
+
+The doorman's part of the locked transfer cancel, from
+`~/Desktop/Z-TestNet/forclaude/locked-transfer-cancel-plan-1.md` (FINAL,
+2026-11-11; the validator's `docs/schemas.md` section 28 and 5.8): a
+guarded or vault transfer waits out its lock on the validators, a week or
+a month in production, and nothing could be done with it meanwhile, so a
+transfer sent by mistake went through when the lock ended. The sender can
+now take it back until it is written, with a new follow-up kind, the
+ninth, **`lockedTransferCancel`**, at a route of its own, **`POST
+/locked-transfer-cancel`**: `{ payload: { type: 'lockedTransferCancel',
+transactionId, accountId, signedAt }, signatures }`, signed by the
+sender, `accountId`, with the account's own keys under the usual rule,
+any two pairs. The kind names no rule and has no field of its own. The
+validator door passes only the paths in its table, so the route gets its
+line, `POST /locked-transfer-cancel` at 64 KB, with the check every
+follow-up route has, built from its one kind (`src/checks/follow-ups.js`,
+`src/doors/validator.routes.js`): the common shape of a follow-up, then
+the signatures decoding under any two pairs. Without the line the door
+would answer `404 Not Found` to every cancel before a validator saw it,
+and a press of the wallet's button (the plan's step 4) would end in that
+refusal. The rest is the worker's, as for every follow-up: the held row,
+the sender, the wait before a cancel (the validator's 27.2) and the
+cancellation slot. The plan's step 1, the time check on every incoming
+transfer (the validator's section 27), changes nothing at the door, which
+compares no date with a clock. Step 3 of the plan, built 2026-11-11.
+Nothing else in the door changes: the five other follow-up routes and
+their eight kinds, the submission routes, the reads, the validator
+routes, the keyholder door, the rate limit and the relay are as they
+were; no new npm package, no env variable, and no file under `deploy/`
+changes; nginx's cap on the port stays at 256k, the route's own cap is
+the 64 KB of the other follow-up routes. The checks were `node --check`
+on the two files and one import of the route table, and beyond the plan
+the new route's check run on made-up bodies (9.2); no door was started.
+The last pull at the phase 3 launch is the test, every validator and
+every doorman on the new code before a wallet can cancel (the plan's
+decision 19 and section 5).
+
+### 9.1 The change
+
+- `src/checks/follow-ups.js`: the kind `lockedTransferCancel` (`type`
+  `lockedTransferCancel`, signer `accountId`, no `rule`), the ninth,
+  frozen, after `assistedTransferCancel`, with a one-line comment as the
+  others have. It names no rule, so `followUpCheck` checks its signatures
+  under any two pairs, through `kind.rule ?? ANY_TWO_PAIRS`, as for the
+  seven other kinds without one. `followUpCheck` and
+  `checkAttachmentShape` are untouched. The header says six follow-up
+  routes, names `/locked-transfer-cancel`, and says nine kinds; and, on
+  the user's word (9.2), its list of the worker's kind modules names
+  `src/locked-transactions/`.
+- `src/doors/validator.routes.js`: the import; `{ method: 'POST', path:
+  '/locked-transfer-cancel', maxBytes: 64 * 1024, check:
+  followUpCheck([lockedTransferCancel]) }` after the line of
+  `/assisted-transfer-cancel`; the comment on the follow-up routes says
+  six.
+- `README.md`: a `/locked-transfer-cancel` row in the validator door's
+  table, after the row of `/assisted-transfer-cancel`; the Layout line of
+  `checks/follow-ups.js` says six routes and nine kinds; the design record
+  paragraph names this section and, on the user's word (9.2), section 8.
+- `docs/schemas.md`: this section; 1.1's body caps bullet. The wallet
+  submission routes are ten with the new one. The bullet said "64 KB for
+  the nine wallet submission routes" and first became "ten", the plan's
+  change; on the user's word (9.2) it says "the other nine", since
+  `/create-account`, the tenth, has 96 KB.
+
+### 9.2 Notes from the build
+
+Where the plan was silent the simplest thing was chosen and is recorded
+here; nothing in 9.1 was changed.
+
+- **The build was made on main at 2b166aa**, the merge of the `seth`
+  branch, the commit the plan read, with a clean working tree. Every line
+  the plan quotes was where it said, and the last section was 8, so this
+  is 9, as the plan expected. The validator's steps 1 and 2 were read from
+  its commits 0f80003 and becc435. The strings the door mirrors are its:
+  the type `lockedTransferCancel` and the signer field `accountId`
+  (`src/locked-transactions/locked-transfer-cancel.js`), and the path
+  (`src/locked-transactions/locked-transactions.router.js`). Its
+  `checkAttachmentShape` has the reasons of the door's copy, word for
+  word, so the copy needed no change, as the plan says.
+- **Nothing differed from the plan.** The kind has its two members and no
+  `rule`, frozen, after `assistedTransferCancel`. The route line is the
+  plan's, after the line of `/assisted-transfer-cancel` and so before the
+  line of `/break-glass-cancel`. The README row has the plan's words.
+- **Where the plan left the words open.** The kind's comment is "The
+  sender taking a guarded or vault transfer back.", in the words of the
+  assisted cancel's comment above it; until when the worker accepts a
+  cancel is not said at the door. The import of `lockedTransferCancel`
+  stands after `guardianVote`, the list being in alphabetical order. In
+  the header of `follow-ups.js` the new path stands after
+  `/assisted-transfer-cancel`, the table's order, and the header's first
+  paragraph was wrapped again from there on; its other words are as they
+  were. In the comment on the follow-up routes only "five" became "six".
+  The README's design record paragraph gained its clause at the end, in
+  the manner of the clauses before it.
+- **The cap is the plan's**, the 64 KB of the other follow-up routes. A
+  cancel signed by all three pairs, in hex, measures 28,507 bytes; the
+  wallet signs with two. The header comment of `validator.routes.js`,
+  which lists measured sizes, was not touched: its "a transfer or
+  follow-up with three pairs 28 KB" covers the cancel.
+- **Three places the plan does not name** were first left as they were
+  and then changed on the user's word, given the same day when the build
+  was reported: "Yes, fix them". Comments and prose only, no line of
+  code. In the header of `src/checks/follow-ups.js`, the list that says
+  where the worker's kind modules are had `src/assisted-transfers/`,
+  `src/fund/guardian-vote.js` and `src/escrow/`, and has
+  `src/locked-transactions/` too, where the new kind's module is; the
+  header's second paragraph was wrapped again from there on, its other
+  words as they were. The README's design record paragraph named
+  sections 1 to 7 and, with this step, 9: section 8, the owner lookup,
+  had never been added to it, and is named now, before section 9. And
+  1.1's body caps bullet above: it gave 64 KB to "the nine wallet
+  submission routes", then to "the ten" with the plan's change, and the
+  count included `/create-account`, which the same sentence gives 96 KB,
+  as it had since build 1; it says "the other nine" now, the ten less
+  `/create-account`, and three of its lines were wrapped again. Nothing
+  else that the new route made false was found. A search of the whole
+  repo for the counts of routes and kinds and for the names of the two
+  older cancels found only the lines the plan names and the dated notes
+  of the sections before this one, which tell what was true when they
+  were written. Every check below was run once more after these changes,
+  with the same answers.
+- **Checks.** `node --check` passed on `src/checks/follow-ups.js` and
+  `src/doors/validator.routes.js`, on Node 24.22.0. One import of
+  `src/doors/validator.routes.js` from the shell, run from a folder
+  outside the repo, printed the new route's row: `POST`,
+  `/locked-transfer-cancel`, 65536 bytes, a check function, the row
+  frozen; row 7 of 34, after `/assisted-transfer-cancel` and before
+  `/break-glass-cancel`; the path once in the table. The import needed no
+  env value and no key file: the table's imports reach the registry copy,
+  read from the committed file, and nothing of `src/config/env.js`.
+- **Beyond the plan, the route's check on made-up bodies.** A throwaway
+  script outside the repo imported the same table and ran the check of
+  the new route on bodies whose signatures were zero bytes of the right
+  lengths, which the door only decodes. 21 answers, all as expected. A
+  cancel signed by pair one and the wallet pair, as the wallet signs, by
+  the two user pairs, or by all three, passed. Refused, each with the
+  worker's reason: a body that is not an object; no payload; another
+  kind's type, or none (`payload.type must be "lockedTransferCancel"`);
+  no `transactionId`, no `accountId`, no `signedAt`; no signatures; one
+  pair alone, and the break-glass pair alone (`signatures must come from
+  at least 2 of the key pairs key1, key2 and walletKey`); half a pair; a
+  signature that is not a string; one that does not decode. The same
+  cancel sent to `/assisted-transfer-cancel` or `/break-glass-cancel` was
+  refused for its type, and each of those two routes still passed its own
+  kind.
+- **Beyond the plan, the two tables side by side.** The 34 paths of the
+  door's table are the 34 `POST` paths the validator's routers serve at
+  becc435, no more and no fewer.
+- **No door was started**, no validator and no doorman was touched, and
+  no test script or fixture was written into the repo.

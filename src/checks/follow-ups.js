@@ -3,26 +3,27 @@ import { refuse } from '../util/result.js';
 import { ANY_TWO_PAIRS, BREAK_GLASS_PAIR, checkSignaturesDecode } from './account-signatures.js';
 
 /**
- * The door's checks on the five follow-up routes, /attestation,
- * /assisted-transfer-cancel, /break-glass-cancel, /guardian-vote and
- * /escrow-signature. A follow-up is { payload, signatures }: payload.type
- * names its kind, payload.transactionId the held transaction it attaches
- * to, the kind's signer field the signer's account id, payload.signedAt
- * when it was signed; the signatures are the signer's account keys under
- * the kind's rule, any two pairs, or the break-glass pair alone for the
- * break-glass cancel (2026-11-08, docs/schemas.md section 5).
+ * The door's checks on the six follow-up routes, /attestation,
+ * /assisted-transfer-cancel, /locked-transfer-cancel, /break-glass-cancel,
+ * /guardian-vote and /escrow-signature. A follow-up is { payload,
+ * signatures }: payload.type names its kind, payload.transactionId the
+ * held transaction it attaches to, the kind's signer field the signer's
+ * account id, payload.signedAt when it was signed; the signatures are the
+ * signer's account keys under the kind's rule, any two pairs, or the
+ * break-glass pair alone for the break-glass cancel (2026-11-08,
+ * docs/schemas.md section 5).
  *
  * followUpCheck(kinds) builds the check of one route from the kinds its
- * worker handler allows. Each of the eight kinds is { type, signerField }
+ * worker handler allows. Each of the nine kinds is { type, signerField }
  * and, where the kind has a rule of its own, rule, as the worker's kind
- * modules export them (src/assisted-transfers/, src/fund/guardian-vote.js,
- * src/escrow/); what else a kind has there (its table, its stake, its own
- * fields and checks, its effect) stays on the worker. The shape is the
- * common part of attachments.service.js checkAttachmentShape, with the same
- * reasons; then account-signatures.js checkSignaturesDecode under the
- * kind's rule, any two pairs when it names none. The held row, the
- * signer's account and stake and the verification against its keys are
- * the worker's.
+ * modules export them (src/assisted-transfers/, src/locked-transactions/,
+ * src/fund/guardian-vote.js, src/escrow/); what else a kind has there (its
+ * table, its stake, its own fields and checks, its effect) stays on the
+ * worker. The shape is the common part of attachments.service.js
+ * checkAttachmentShape, with the same reasons; then account-signatures.js
+ * checkSignaturesDecode under the kind's rule, any two pairs when it names
+ * none. The held row, the signer's account and stake and the verification
+ * against its keys are the worker's.
  */
 
 /** An attestor vouching for an assisted transfer. */
@@ -30,6 +31,9 @@ export const attestation = Object.freeze({ type: 'attestation', signerField: 'at
 
 /** The sender taking an assisted transfer back. */
 export const assistedTransferCancel = Object.freeze({ type: 'assistedTransferCancel', signerField: 'accountId' });
+
+/** The sender taking a guarded or vault transfer back. */
+export const lockedTransferCancel = Object.freeze({ type: 'lockedTransferCancel', signerField: 'accountId' });
 
 /** The break-glass pair taking a break-glass move back, under its own rule: the break-glass pair alone. */
 export const breakGlassCancel = Object.freeze({ type: 'breakGlassCancel', signerField: 'accountId', rule: BREAK_GLASS_PAIR });

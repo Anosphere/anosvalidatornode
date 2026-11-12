@@ -110,6 +110,7 @@ The validator door (port 3000; KB is 1024 bytes):
 | `/fund-proposal` | 64 KB | the fundProposal shape, payouts included; signatures, any two pairs |
 | `/attestation` | 64 KB | the follow-up shape with `payload.type` `attestation`, signer `attestorId`; signatures, any two pairs |
 | `/assisted-transfer-cancel` | 64 KB | follow-up, kind `assistedTransferCancel`, signer `accountId` |
+| `/locked-transfer-cancel` | 64 KB | follow-up, kind `lockedTransferCancel`, signer `accountId` |
 | `/break-glass-cancel` | 64 KB | follow-up, kind `breakGlassCancel`, signer `accountId`; signatures, the break-glass pair alone |
 | `/guardian-vote` | 64 KB | follow-up, kind `guardianVote`, signer `guardianId` |
 | `/escrow-signature` | 64 KB | follow-up, kinds `escrowSuccess`, `escrowCancel`, `escrowDispute` (signer `accountId`) and `escrowVerdict` (signer `arbitratorId`) |
@@ -376,7 +377,7 @@ src/
   checks/account-signatures.js   the three signing pairs and the break-glass pair, the two rules, decode-only
   checks/create-account.js       shape, eight keys decode, eight signatures decode and verify
   checks/transfers.js            /anos-transfer, /transfer-to-fund, /fund-proposal
-  checks/follow-ups.js           the five follow-up routes and the eight kinds
+  checks/follow-ups.js           the six follow-up routes and the nine kinds
   checks/reads.js                the seven signed reads and the three public reads
   checks/validator-messages.js   the fourteen validator routes (seven, plus the catch-up build's seven), verified against the registry
   checks/keyholder.js            the ten keyholder routes by level
@@ -417,4 +418,9 @@ section 6, "The DAO stake read (2026-11-08)", the first public read,
 `/list-dao-stakes`, let through the validator door; section 7, "The fund
 proposal reads (2026-11-08)", two more public reads, `/list-fund-proposals`
 and `/get-fund-proposal`, let through the same way for the wallet's
-Guardians page.
+Guardians page; section 8, "The owner lookup (2026-11-08)", the unsigned
+keyholder route `/get-owner`, let through the keyholder door for a
+locked-out person's recovery; section 9, "The locked transfer cancel
+(2026-11-11)", the sender's cancel of a guarded or vault transfer,
+`/locked-transfer-cancel`, the sixth follow-up route, let through the
+validator door.
