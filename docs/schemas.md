@@ -1150,3 +1150,207 @@ here; nothing in 9.1 was changed.
   becc435, no more and no fewer.
 - **No door was started**, no validator and no doorman was touched, and
   no test script or fixture was written into the repo.
+
+## 10. The worker's disk, its backups, the key bucket and the budget (2026-11-12)
+
+Four more things for `scripts/bootstrap-project.sh`, the script a banker's
+Cloud Shell line downloads, from
+`~/Desktop/Z-TestNet/forclaude/cloud-shell-script-plan-1.md` (FINAL,
+2026-11-12) and, for the backups,
+`~/Desktop/Z-TestNet/forclaude/worker-backups-plan-1.md` (FINAL,
+2026-11-10, not built until now): the worker's disk grown from the
+Console's 10 GB to 50 GB; a copy of the worker's whole disk every 4 hours,
+kept 14 days, in a Backup and DR vault in the banker's own project; a
+locked bucket for the three key files of the keyholder GUI; and a billing
+budget. Until this build no worker had a backup, the disk was the default,
+the budget was a Console page the script only named, and the GUI's README
+told the banker to upload `key3.blob` to a bucket of their own making. The
+banker still pastes one line, the A3 line of the operator guide; a banker
+set up before this build pastes it once more at the last pull of the phase
+3 launch (`~/Desktop/Z-TestNet/test_net_phase_3_launch/`). Nothing under
+`src/`, `deploy/` or `network/` changed, and the doorman itself runs none
+of this.
+
+### 10.1 The decisions, as they apply to the script
+
+- **The disk, point `2.12`.** The worker's boot disk is read from the VM
+  (`disks[0]`) and its size from the disk. Under 50 GB it is grown to 50,
+  with `--quiet`, which answers the resize's question with yes, and the
+  worker is stopped. Then, whatever happened before, a worker that is not
+  `RUNNING` is started, and its internal IP read again for the values at
+  the end. So a run that ended between the stop and the start is mended
+  by the next one, which finds the disk at 50 GB and the worker off.
+  Google's page says a VM made from a public image takes the new space
+  without a restart; that had not been seen on Debian 13, and the stop
+  and start is what `2.8` already does.
+- **The backups, points `12.1` to `12.5`,** as the backups plan's section 2
+  has them: the API `backupdr.googleapis.com`; the vault `worker-vault` in
+  the worker's region, 14 days enforced, `within-project`, the 14 days
+  locked from seven days after the run (`--effective-time`, a date, worked
+  out with GNU `date` and, where that fails, with BSD `date`); the plan
+  `worker-plan`, one rule `worker-rule`, hourly, every 4 hours, window 0
+  to 23 UTC, 14 days; the attachment `worker-association` of the plan to
+  the VM `worker`. The vault has the key ring's six tries, five seconds
+  apart, around the first call after the API was enabled. `12.5` reads
+  the attachment's state, plan and VM, and waits up to two minutes (24
+  tries, five seconds apart) for the state `ACTIVE`; only the state ends
+  the run. A vault and a VM in one project need no role granted.
+- **The bucket, points `13.1` to `13.3`.** `gs://<project id>-key-backup`,
+  in the worker's region, uniform bucket-level access, public access
+  prevention, a retention period of 365 days. The lock of the retention
+  period asks before it locks and its answer under `--quiet` is no, with
+  no error; so `13.2` pipes `y` into the command, and `13.3` reads the
+  lock back from the bucket's description as JSON (`"isLocked": true`) and
+  ends the run, naming the line to paste by hand, when it is not there.
+- **The budget, point `14.1`, last, and never ending the run.** The two
+  APIs `cloudbilling.googleapis.com` and `billingbudgets.googleapis.com`,
+  the project's billing account, its currency, the amount for that
+  currency (USD 100, THB 3500, EUR 90, GBP 80, CAD 140, AUD 150, SGD 135,
+  JPY 15000), the budgets of the account by display name, then the
+  budget `anos validator <project id>`: that amount a month, this project
+  only, alerts at 90 and 100 percent. Whatever fails, the point prints
+  `14.1 budget: not made here; ...` with the Console page, the reason is
+  in the log, and the run goes on to `done`.
+- **Point `2.11`** keeps its number and prints one line that points to
+  `14.1`.
+- **A second run** answers `already` at every one of the new points.
+
+### 10.2 Files
+
+Changed: `scripts/bootstrap-project.sh` (the header comment; `2.11`; the
+new `2.12`; the new `12.1` to `14.1` between `5.3` and the values; the
+`done` line, which now names steps 12 and 13). `README.md` (the scripts
+table: steps 2, 5, 12, 13 and 14; the sentence on the budget). This
+section. Beside the repo: `guides/operator-guide.md` (A3; B 2, points 11
+and 12; the new steps 12, Backups, with "If the worker is lost", 13, The
+bucket for the key files, and 14, The budget).
+
+What each new point prints, the first time and on a later run:
+
+| point | first run | later |
+| --- | --- | --- |
+| `2.11` | `budget: made at the end of this run, point 14.1` | the same |
+| `2.12` | `worker disk: grown from 10 GB to 50 GB; worker stopped and started (internal IP <ip>)` | `worker disk: already 50 GB` |
+| `12.1` | `Backup and DR API: enabled` | `already enabled` |
+| `12.2` | `vault worker-vault in <region>: created, the 14 days locked from <date>` | `already` |
+| `12.3` | `plan worker-plan: created, a backup every 4 hours, kept 14 days` | `already` |
+| `12.4` | `association worker-association: created, the first backup within 4 hours` | `already` |
+| `12.5` | `look again: ACTIVE worker-plan worker` | the same |
+| `13.1` | `bucket <project id>-key-backup: created in <region>, every file kept 365 days` | `already` |
+| `13.2` | `bucket lock: locked` | `already locked` |
+| `13.3` | `look again: <project id>-key-backup is locked` | the same |
+| `14.1` | `budget: made, <amount> <currency> a month, alerts at 90 and 100 percent` | `budget: already` |
+
+### 10.3 Notes from the build
+
+- **The build was made on main at 3ac3521**, the merge of the `seth`
+  branch with row 25, with a clean working tree, in the planning chat
+  itself, on the user's word that the plan was final. The four edits of
+  the plan's section 1 went in word for word: the built file is equal,
+  byte for byte, to the scratch copy that passed `sh -n` and `dash -n`
+  before the plan was final, and `sh -n` passed again on the built file.
+  Nothing ran against Google: the first run is the user's, on validator 1,
+  before the first banker of the last pull (the plan's section 5).
+- **Nothing differed from the plan.** The last section was 9, so this is
+  10, as the plan says.
+- **Not seen yet, and to be read at that first run:** the exact words
+  Google prints for the vault, the plan and the attachment; whether 4
+  hours is taken as the least between two backups of a VM (the command's
+  reference says 4 to 23; two how-to pages say six; if 4 is refused the
+  number becomes 6, by the backups plan's own words, "the tightest the
+  service allows"); whether the attachment's `resource` reads `worker`
+  (only its state ends the run, so another reading does no harm); the
+  field names of the bucket's description (the lock is found by its JSON
+  text, whichever shape the description has); whether `365d` is taken for
+  the retention period as Google's examples write it; whether Debian 13
+  shows about 50G after the start; and the billing calls, which need the
+  banker to hold a role on their billing account.
+- **Validators 1 to 4** were set up by hand and never ran this script;
+  the same first run shows whether every older point answers `already`
+  there.
+
+## 11. The bucket for the keyholder's share copies (2026-11-12)
+
+One more step for `scripts/bootstrap-project.sh`, from section 2 of
+`~/Desktop/Z-TestNet/forclaude/keyholder-share-copies-plan-1.md` (FINAL,
+2026-11-12): step 15, a second locked bucket in the banker's own project.
+The keyholder writes one small file there for every share it saves
+(keyholdersoftware `docs/schemas.md` section 16). The vault of step 12
+copies the worker every 4 hours, so a worker restored from it lacks the
+shares that came after the last copy; their files are in this bucket. The
+banker still pastes one line, the A3 line of the operator guide. A banker
+set up before this build gets step 15 from the Cloud Shell line of the
+last pull (`~/Desktop/Z-TestNet/test_net_phase_3_launch/last-set-up-commands.md`,
+step 2), which comes before the worker's paste there. Nothing under
+`src/`, `deploy/` or `network/` changed, and the doorman itself runs none
+of this. The worker's calls to the bucket leave through the doorman's
+NAT, like its other calls, and count toward the egress quota; a file is a
+few kilobytes.
+
+### 11.1 The decisions, as they apply to the script
+
+- **Where.** After `14.1` and before the values that leave the script.
+  The shape is step 13's. Step 13 is not touched: step 15 has its own
+  variable for its bucket (`COPIES_BUCKET`) and its own function for its
+  lock (`copies_bucket_locked`).
+- **`15.1`, the bucket.** `gs://<project id>-share-copies`, in the
+  worker's region, uniform bucket-level access, public access prevention,
+  a retention period of 365 days; `already` when a describe finds it. No
+  old versions are kept and no filter is set.
+- **`15.2`, the lock** of the 365 days, the `y` piped in as at `13.2`;
+  `already locked` when the bucket's description says so. Locking puts a
+  lien on the project, as step 13's lock does.
+- **`15.3`, the worker's permission.** `roles/storage.objectCreator` on
+  the bucket for the worker's service account, the one `2.2` read. Set on
+  every run, as the KMS binding of `5.2` is. The role lets the account
+  add files; it cannot read, delete or replace one.
+- **`15.4`, the look.** The lock read back as `13.3` does, and the
+  bucket's permissions read back for the worker's account. The run ends
+  when either is missing, naming the line to paste by hand.
+- **The header comment** names step 15. **The `done:` line** is as it
+  was.
+
+### 11.2 Files
+
+Changed: `scripts/bootstrap-project.sh` (the header comment; the new
+`15.1` to `15.4` between `14.1` and the values). `README.md` (the scripts
+list: steps 2, 5, 12, 13, 14 and 15). This section. Beside the repo:
+`guides/operator-guide.md` (A3; step 7, point 4; the new step 15), and
+the keyholder, the worker script and the launch commands as the plan
+lists them.
+
+What each new point prints, the first time and on a later run:
+
+| point | first run | later |
+| --- | --- | --- |
+| `15.1` | `bucket <project id>-share-copies: created in <region>, every file kept 365 days` | `bucket <project id>-share-copies: already` |
+| `15.2` | `bucket lock: locked` | `bucket lock: already locked` |
+| `15.3` | `worker may add files: roles/storage.objectCreator for <service account>` | the same |
+| `15.4` | `look again: <project id>-share-copies is locked, the worker may add files` | the same |
+
+### 11.3 Notes from the build
+
+- **The build was made on main at dec3633**, with a clean working tree.
+  `sh -n` and `dash -n` passed on the script. Nothing ran against Google:
+  the first run is validator 1's (the plan's section 5).
+- **Nothing differed from the plan.** The last section was 10, so this is
+  11.
+- **`15.4` reads the permissions without a filter.** Google's reference
+  for `gcloud storage buckets get-iam-policy` lists no `--filter`; it
+  takes the gcloud-wide `--flatten` and `--format`. So the policy is
+  flattened on `bindings[].members` and printed as
+  `value(bindings.role,bindings.members)`, one role and one member per
+  line, into the log, and the line `roles/storage.objectCreator
+  serviceAccount:<service account>` is looked for among them, whole.
+- **Not seen yet, and to be read at that first run:** the words gcloud
+  prints at `15.1` to `15.3`, and whether the flattened policy prints as
+  `15.4` expects. If it does not, `15.4` ends the run although the bucket
+  is right: `15.1` to `15.3` are done by then, the log holds what was
+  printed, and the keyholder's own test line at its next start says
+  whether the bucket takes files.
+- **The worker's account may hold more than this role.** Google gives a
+  VM's default account the Editor role in many projects, and its page on
+  the roles says a new bucket gives the project's editors a legacy owner
+  role on it. Such an account can also read the bucket, and delete a file
+  once it is older than 365 days. The lock is what protects the files.
+  Narrowing the account is not in this build.

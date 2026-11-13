@@ -1,9 +1,11 @@
 #!/bin/sh
 # Prepares an operator's Google Cloud project for the two VMs of a
-# validator: the operator guide's step 2 (the network) and step 5 (Cloud
-# KMS), point by point, one line printed per point. Runs in Cloud Shell, as
-# the operator, with the project set first; every value is a flag and
-# nothing is asked:
+# validator: the operator guide's step 2 (the network and the worker's
+# disk), step 5 (Cloud KMS), step 12 (the worker's backups), step 13 (the
+# bucket for the key files), step 14 (the budget) and step 15 (the bucket
+# for the copies of the keyholder's shares), point by point, one line
+# printed per point. Runs in Cloud Shell, as the operator, with the project
+# set first; every value is a flag and nothing is asked:
 #
 #   gcloud config set project <project id> && curl -fsSLO https://raw.githubusercontent.com/Anosphere/anosvalidatornode/main/scripts/bootstrap-project.sh && sh bootstrap-project.sh --zone <zone> --doorman-ip <doorman static ip> --id <N>
 #
@@ -351,9 +353,36 @@ else
   say '2.10 ssh key: made'
 fi
 
-# 2.11 The budget is a Console page.
+# 2.11 The budget is made at the end of this run, point 14.1.
 at 2.11 budget
-say '2.11 budget: a Console page, not done here (Billing, Budgets & alerts, Create budget, alerts at 50, 90 and 100 percent)'
+say '2.11 budget: made at the end of this run, point 14.1'
+
+# 2.12 The worker's boot disk: 50 GB. A smaller disk is grown, which loses
+#      nothing and cannot be undone, and the worker is stopped and started
+#      so that Debian takes the new space as it boots. A worker that is not
+#      running is started, so a run that ended between the stop and the
+#      start is mended by the next one.
+at 2.12 'worker disk'
+WORKER_DISK=$(vm_value worker 'disks[0].source.basename()')
+[ -n "$WORKER_DISK" ] || fail 'the worker has no boot disk'
+DISK_GB=$(gcloud compute disks describe "$WORKER_DISK" --zone "$ZONE" --format='value(sizeGb)')
+matches "$DISK_GB" '^[0-9]+$' || fail "the size of the disk $WORKER_DISK reads \"$DISK_GB\", not a number of GB"
+if [ "$DISK_GB" -ge 50 ]; then
+  DISK_LINE="already $DISK_GB GB"
+  STOPPED=''
+else
+  gcloud compute disks resize "$WORKER_DISK" --zone "$ZONE" --size 50 --quiet
+  gcloud compute instances stop worker --zone "$ZONE" --quiet
+  DISK_LINE="grown from $DISK_GB GB to 50 GB"
+  STOPPED='stopped and '
+fi
+if [ "$(vm_value worker status)" = RUNNING ]; then
+  say "2.12 worker disk: $DISK_LINE"
+else
+  gcloud compute instances start worker --zone "$ZONE" --quiet
+  WORKER_IP=$(vm_value worker 'networkInterfaces[0].networkIP')
+  say "2.12 worker disk: $DISK_LINE; worker ${STOPPED}started (internal IP $WORKER_IP)"
+fi
 
 # 5.2 Cloud KMS: the API.
 at 5.2 'KMS API'
@@ -415,6 +444,208 @@ echo "$LISTED"
 has_line "$LISTED" "$KMS_KEY_NAME" || fail "kms keys list does not show $KMS_KEY_NAME"
 say "5.3 KMS key: $KMS_KEY_NAME"
 
+# 12.1 Backups of the worker, by Google's Backup and DR service: the API.
+at 12.1 'Backup and DR API'
+if [ -n "$(gcloud services list --enabled --filter='config.name=backupdr.googleapis.com' --format='value(config.name)')" ]; then
+  say '12.1 Backup and DR API: already enabled'
+else
+  gcloud services enable backupdr.googleapis.com --quiet
+  say '12.1 Backup and DR API: enabled'
+fi
+
+# 12.2 The vault, in the worker's region: every backup kept at least 14
+#      days, this project only, the 14 days locked from seven days after
+#      today. Right after the API is enabled the first call may fail for a
+#      few seconds: up to six tries, five seconds apart.
+at 12.2 'vault worker-vault'
+LOCK_DATE=$(date -u -d '+7 days' +%Y-%m-%d 2>/dev/null || date -u -v+7d +%Y-%m-%d)
+matches "$LOCK_DATE" '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' || fail "the lock date reads \"$LOCK_DATE\", not a date like 2026-11-20"
+VAULT=''
+try=1
+while [ -z "$VAULT" ]; do
+  if gcloud backup-dr backup-vaults describe worker-vault --location "$REGION"; then
+    VAULT=already
+  elif gcloud backup-dr backup-vaults create worker-vault --location "$REGION" --backup-min-enforced-retention p14d --access-restriction within-project --effective-time "$LOCK_DATE" --description 'the worker disk, every 4 hours, kept 14 days' --no-async; then
+    VAULT="created, the 14 days locked from $LOCK_DATE"
+  elif [ "$try" -ge 6 ]; then
+    fail "vault worker-vault in $REGION: neither found nor created after $try tries"
+  else
+    try=$((try + 1))
+    sleep 5
+  fi
+done
+say "12.2 vault worker-vault in $REGION: $VAULT"
+
+# 12.3 The plan: a backup every 4 hours around the clock, each kept 14 days.
+at 12.3 'plan worker-plan'
+if gcloud backup-dr backup-plans describe worker-plan --location "$REGION"; then
+  say '12.3 plan worker-plan: already'
+else
+  gcloud backup-dr backup-plans create worker-plan --location "$REGION" --resource-type compute.googleapis.com/Instance --backup-vault worker-vault --backup-rule rule-id=worker-rule,recurrence=HOURLY,hourly-frequency=4,time-zone=UTC,backup-window-start=0,backup-window-end=23,retention-days=14 --no-async
+  say '12.3 plan worker-plan: created, a backup every 4 hours, kept 14 days'
+fi
+
+# 12.4 The plan attached to the worker VM.
+at 12.4 'association worker-association'
+if gcloud backup-dr backup-plan-associations describe worker-association --location "$REGION"; then
+  say '12.4 association worker-association: already'
+else
+  gcloud backup-dr backup-plan-associations create worker-association --location "$REGION" --workload-project "$PROJECT" --backup-plan worker-plan --resource "projects/$PROJECT/zones/$ZONE/instances/worker" --resource-type compute.googleapis.com/Instance --no-async
+  say '12.4 association worker-association: created, the first backup within 4 hours'
+fi
+
+# 12.5 Look again: the attachment's state, its plan and its VM. Google may
+#      need a moment to take a new attachment: up to two minutes for the
+#      state ACTIVE, then the run ends naming the state it found.
+at 12.5 'look again'
+try=1
+while :; do
+  ASSOCIATION=$(gcloud backup-dr backup-plan-associations describe worker-association --location "$REGION" --format='value(state,backupPlan.basename(),resource.basename())' | tr '\t' ' ')
+  if [ "${ASSOCIATION%% *}" = ACTIVE ]; then
+    break
+  fi
+  if [ "$try" -ge 24 ]; then
+    fail "the association worker-association is \"$ASSOCIATION\", not ACTIVE"
+  fi
+  try=$((try + 1))
+  sleep 5
+done
+say "12.5 look again: $ASSOCIATION"
+
+# 13.1 The bucket for the keyholder GUI's key files: in the worker's
+#      region, closed to the public, every file kept 365 days.
+at 13.1 "bucket $PROJECT-key-backup"
+BUCKET="gs://$PROJECT-key-backup"
+if gcloud storage buckets describe "$BUCKET"; then
+  say "13.1 bucket $PROJECT-key-backup: already"
+else
+  gcloud storage buckets create "$BUCKET" --location "$REGION" --uniform-bucket-level-access --public-access-prevention --retention-period 365d
+  say "13.1 bucket $PROJECT-key-backup: created in $REGION, every file kept 365 days"
+fi
+
+# 13.2 The 365 days locked, which cannot be undone: from then on nobody can
+#      shorten them or take them off the bucket. gcloud asks before it locks
+#      and takes no for an answer under --quiet, so the yes is piped in.
+at 13.2 'bucket lock'
+# bucket_locked: the bucket's description says its retention is locked.
+bucket_locked() {
+  gcloud storage buckets describe "$BUCKET" --format=json | grep -q '"isLocked": true'
+}
+if bucket_locked; then
+  say '13.2 bucket lock: already locked'
+else
+  printf 'y\n' | gcloud storage buckets update "$BUCKET" --lock-retention-period
+  say '13.2 bucket lock: locked'
+fi
+
+# 13.3 Look again: the lock, read back.
+at 13.3 'look again'
+bucket_locked || fail "the 365 days of $BUCKET are not locked: paste gcloud storage buckets update $BUCKET --lock-retention-period and answer y"
+say "13.3 look again: $PROJECT-key-backup is locked"
+
+# 14.1 The budget: 100 USD a month for this project, or about that much in
+#      the billing account's own currency, with email alerts at 90 and 100
+#      percent of it. Visibility, not a cap. This point never ends the run:
+#      when the budget cannot be made here the line says so and names the
+#      Console page, and the log holds the reason.
+at 14.1 budget
+BUDGET_NAME="anos validator $PROJECT"
+# budget_amount CURRENCY: about 100 USD in that currency; nothing for a
+# currency that is not listed.
+budget_amount() {
+  case $1 in
+    USD) echo 100 ;;
+    THB) echo 3500 ;;
+    EUR) echo 90 ;;
+    GBP) echo 80 ;;
+    CAD) echo 140 ;;
+    AUD) echo 150 ;;
+    SGD) echo 135 ;;
+    JPY) echo 15000 ;;
+  esac
+}
+# make_budget: sets BUDGET_LINE and returns 0 when the budget is there or
+# was made; returns 1 otherwise, the reason in the log.
+make_budget() {
+  gcloud services enable cloudbilling.googleapis.com billingbudgets.googleapis.com --quiet || return 1
+  billing=$(gcloud billing projects describe "$PROJECT" --format='value(billingAccountName)') || return 1
+  billing=${billing#billingAccounts/}
+  if [ -z "$billing" ]; then
+    echo 'the project has no billing account'
+    return 1
+  fi
+  currency=$(gcloud billing accounts describe "$billing" --format='value(currencyCode)') || return 1
+  amount=$(budget_amount "$currency")
+  if [ -z "$amount" ]; then
+    echo "no budget amount is listed for the currency \"$currency\""
+    return 1
+  fi
+  try=1
+  until budgets=$(gcloud billing budgets list --billing-account "$billing" --format='value(displayName)'); do
+    if [ "$try" -ge 6 ]; then
+      return 1
+    fi
+    try=$((try + 1))
+    sleep 5
+  done
+  if has_line "$budgets" "$BUDGET_NAME"; then
+    BUDGET_LINE=already
+    return 0
+  fi
+  gcloud billing budgets create --billing-account "$billing" --display-name "$BUDGET_NAME" --budget-amount "$amount$currency" --calendar-period month --filter-projects "projects/$PROJECT" --threshold-rule percent=0.9 --threshold-rule percent=1.0 || return 1
+  BUDGET_LINE="made, $amount $currency a month, alerts at 90 and 100 percent"
+}
+if make_budget; then
+  say "14.1 budget: $BUDGET_LINE"
+else
+  say '14.1 budget: not made here; make it on the Console page (Billing, Budgets & alerts, Create budget: 100 USD a month for this project, alerts at 90 and 100 percent)'
+fi
+
+# 15.1 The bucket for the copies of the keyholder's shares: in the worker's
+#      region, closed to the public, every file kept 365 days. The keyholder
+#      writes one small file there for every share it saves, so a worker
+#      restored from its vault lacks none of the shares that came after the
+#      vault's last copy. No old versions are kept and no filter is set.
+at 15.1 "bucket $PROJECT-share-copies"
+COPIES_BUCKET="gs://$PROJECT-share-copies"
+if gcloud storage buckets describe "$COPIES_BUCKET"; then
+  say "15.1 bucket $PROJECT-share-copies: already"
+else
+  gcloud storage buckets create "$COPIES_BUCKET" --location "$REGION" --uniform-bucket-level-access --public-access-prevention --retention-period 365d
+  say "15.1 bucket $PROJECT-share-copies: created in $REGION, every file kept 365 days"
+fi
+
+# 15.2 The 365 days locked, as at 13.2: it cannot be undone, and the yes is
+#      piped in.
+at 15.2 'bucket lock'
+# copies_bucket_locked: the bucket's description says its retention is locked.
+copies_bucket_locked() {
+  gcloud storage buckets describe "$COPIES_BUCKET" --format=json | grep -q '"isLocked": true'
+}
+if copies_bucket_locked; then
+  say '15.2 bucket lock: already locked'
+else
+  printf 'y\n' | gcloud storage buckets update "$COPIES_BUCKET" --lock-retention-period
+  say '15.2 bucket lock: locked'
+fi
+
+# 15.3 The worker's service account may add files to the bucket, and
+#      nothing more: it cannot read, delete or replace one. Set on every
+#      run: the binding is idempotent.
+at 15.3 'worker may add files'
+gcloud storage buckets add-iam-policy-binding "$COPIES_BUCKET" --member "serviceAccount:$SA" --role roles/storage.objectCreator --quiet
+say "15.3 worker may add files: roles/storage.objectCreator for $SA"
+
+# 15.4 Look again: the lock, read back as at 13.3, and the bucket's
+#      permissions, read back one line per role and member, which must show
+#      the worker's account under the role of 15.3.
+at 15.4 'look again'
+copies_bucket_locked || fail "the 365 days of $COPIES_BUCKET are not locked: paste gcloud storage buckets update $COPIES_BUCKET --lock-retention-period and answer y"
+COPIES_POLICY=$(gcloud storage buckets get-iam-policy "$COPIES_BUCKET" --flatten='bindings[].members' --format='value(bindings.role,bindings.members)' | tr '\t' ' ')
+echo "$COPIES_POLICY"
+has_line "$COPIES_POLICY" "roles/storage.objectCreator serviceAccount:$SA" || fail "the permissions of $COPIES_BUCKET do not show roles/storage.objectCreator for $SA: paste gcloud storage buckets add-iam-policy-binding $COPIES_BUCKET --member serviceAccount:$SA --role roles/storage.objectCreator"
+say "15.4 look again: $PROJECT-share-copies is locked, the worker may add files"
+
 # What leaves this script, and the next lines.
 say 'Values for the next lines:'
 say "  worker internal IP      $WORKER_IP"
@@ -423,4 +654,4 @@ say "  KMS key                 $KMS_KEY_NAME"
 say 'Next: SSH to the doorman, then the doorman line (the operator guide, A4):'
 say "  gcloud compute ssh banker@doorman --zone $ZONE --tunnel-through-iap"
 say "  curl -fsSLO https://raw.githubusercontent.com/Anosphere/anosvalidatornode/main/scripts/bootstrap-doorman.sh && sudo sh bootstrap-doorman.sh --worker-ip $WORKER_IP --doorman-ip $DOORMAN_IP --email <your email>"
-say "done: project $PROJECT is ready for the doorman (step 3) and the worker (step 4)"
+say "done: project $PROJECT is ready for the doorman (step 3) and the worker (step 4); the worker's backups (step 12) and the key bucket (step 13) are set up"
